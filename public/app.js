@@ -24,7 +24,7 @@ const icon = n => {
 const logo='<img class="logo-icon" src="/favicon.svg" alt="">';
 const clock=s=>`${String(Math.floor((s||0)/60)).padStart(2,'0')}:${String(Math.floor((s||0)%60)).padStart(2,'0')}`;
 const size=b=>(b/1024/1024).toFixed(1)+' MB';
-const S={session:null,page:'media',assets:[],selectedVideo:null,camera:new Recorder(),progress:new Set(),latestAudio:null,adminState:null,cloneJob:null};
+const S={session:null,page:'media',assets:[],selectedVideo:null,camera:new Recorder(),progress:new Set(),latestAudio:null,adminState:null,cloneJob:null,scriptStyles:{defaults:[],custom:[]}};
 const pages={media:'Tư liệu video',script:'Viết kịch bản',voice:'Giọng Của Tôi',clone:'Clon giọng Video',settings:'Thiết lập'};
 const canOpenPage=page=>page!=='settings'||S.session?.role==='admin';
 let toastTimer;
@@ -49,7 +49,7 @@ async function busy(button,fn,statusSel){
 }
 function draftKey(){return `cliplab-draft-${S.session.username}`;}
 function saveDraft(){
-  try{localStorage.setItem(draftKey(),JSON.stringify({prompt:$('#script-prompt')?.value||'',script:$('#script-editor')?.value||'',voice:$('#voice-text')?.value||''}))}catch{}
+  try{localStorage.setItem(draftKey(),JSON.stringify({script:$('#script-editor')?.value||'',voice:$('#voice-text')?.value||'',duration:$('#script-duration')?.value||'60',styleId:$('input[name="script-style"]:checked')?.value||''}))}catch{}
 }
 function loginScreen(){
   $('#app').hidden=true;$('#login-screen').hidden=false;
@@ -69,9 +69,38 @@ function mediaMarkup(){
  <div class="library-heading"><h2>Thư viện video <span id="video-count" class="pill">0</span></h2></div><div id="video-library" class="asset-grid"></div>`;
 }
 function scriptMarkup(){
- return `<div class="hero"><div><span class="eyebrow">SCRIPT WRITER</span><h1>Viết kịch bản bằng <span class="hero-accent">DeepSeek / OpenAI.</span></h1></div></div><div class="grid2">
- <section class="panel"><div class="grid2"><div class="field"><label>Nhà cung cấp</label><select id="text-provider"><option value="deepseek">DeepSeek</option><option value="openai">OpenAI</option></select><small id="text-model-label"></small></div><div class="field"><label>Thời lượng</label><select id="script-duration"><option value="30">30 giây</option><option value="60" selected>60 giây</option><option value="90">90 giây</option><option value="180">3 phút</option></select></div></div><div class="field"><label>Phong cách</label><select id="script-style"><option>Tự nhiên, gần gũi</option><option>Giới thiệu sản phẩm rõ ràng</option><option>Kể chuyện, cảm xúc</option><option>Quảng cáo ngắn, mở đầu thu hút</option></select></div><div class="field"><label>Yêu cầu</label><textarea id="script-prompt" rows="9" maxlength="10000"></textarea></div><label class="check"><input id="include-analysis" type="checkbox" checked>Dùng kết quả phân tích video đang chọn.</label><button id="generate-script" class="primary full">Tạo kịch bản</button><p id="script-status" class="status-line"></p></section>
- <section class="panel"><div class="field"><label>Bản thảo</label><textarea id="script-editor" class="script-area" rows="17"></textarea></div><div class="row between"><span id="script-count" class="char-count">0 ký tự</span><button id="export-script" class="small">${icon('down')} TXT</button></div><div class="divider"></div><button id="script-to-voice" class="purple full">Đưa sang tạo giọng Ibee</button></section></div>`;
+ const defaults=S.scriptStyles?.defaults||[],custom=S.scriptStyles?.custom||[],styles=[...defaults,...custom];
+ const cards=styles.map((style,index)=>{
+  const kind=style.kind==='default'?'Mặc định':'Riêng';
+  const badge=style.kind==='default'?'green':'purple';
+  const remove=style.kind==='custom'?'<button type="button" class="small danger" data-delete-script-style="'+esc(style.id)+'">Xóa</button>':'';
+  return '<label class="script-style-card '+(style.kind==='default'?'default-style':'custom-style')+'"><div class="script-style-top"><input type="radio" name="script-style" value="'+esc(style.id)+'" '+(index===0?'checked':'')+'><strong>'+esc(style.name)+'</strong><span class="pill '+badge+'">'+kind+'</span></div><div class="script-style-actions"><button type="button" class="small" data-view-script-style="'+esc(style.id)+'">Xem Prompt</button>'+remove+'</div></label>';
+ }).join('');
+ return '<div class="hero"><div><span class="eyebrow">SCRIPT WRITER</span><h1>Viết kịch bản <span class="hero-accent">theo phong cách của bạn.</span></h1><p>Chọn thời lượng và phong cách phù hợp với video.</p></div></div><div class="grid2">'+
+ '<section class="panel"><div class="field"><label>Thời lượng</label><select id="script-duration"><option value="30">30 giây</option><option value="40">40 giây</option><option value="60" selected>60 giây</option><option value="90">90 giây</option><option value="120">120 giây</option></select></div>'+
+ '<div class="field"><label>Phong cách</label><div class="script-style-grid">'+(cards||'<div class="empty">Chưa có phong cách.</div>')+'</div></div>'+
+ '<div id="style-prompt-viewer" class="notice" hidden><div class="row between"><strong id="style-prompt-title">Prompt phong cách</strong><button type="button" id="close-style-prompt" class="small">Đóng</button></div><div id="style-prompt-text" class="prompt-preview"></div></div>'+
+ '<div class="divider"></div><details class="custom-style-builder"><summary>+ Tạo phong cách riêng</summary><div class="field"><label>Tên phong cách</label><input id="custom-style-name" maxlength="80" placeholder="Ví dụ: Review chân thật"></div><div class="field"><label>Prompt</label><textarea id="custom-style-prompt" rows="6" maxlength="6000" placeholder="Mô tả cách viết, giọng điệu, cấu trúc mở đầu, cách kết thúc..."></textarea></div><button type="button" id="create-script-style" class="primary">Lưu phong cách</button><p id="custom-style-status" class="status-line"></p></details>'+
+ '<label class="check"><input id="include-analysis" type="checkbox" checked>Dùng kết quả phân tích video đang chọn.</label><button id="generate-script" class="primary full">Tạo kịch bản</button><p id="script-status" class="status-line"></p></section>'+
+ '<section class="panel"><div class="field"><label>Bản thảo</label><textarea id="script-editor" class="script-area" rows="17"></textarea></div><div class="row between"><span id="script-count" class="char-count">0 ký tự</span><button id="export-script" class="small">'+icon('down')+' TXT</button></div><div class="divider"></div><button id="script-to-voice" class="purple full">Đưa sang tạo giọng Ibee</button></section></div>';
+}
+async function loadScriptStyles(){S.scriptStyles=await api('script-styles')}
+function allScriptStyles(){return [...(S.scriptStyles?.defaults||[]),...(S.scriptStyles?.custom||[])]}
+function currentScriptStyle(){const id=$('input[name="script-style"]:checked')?.value;return allScriptStyles().find(style=>style.id===id)||null}
+function showStylePrompt(style){if(!style)return;$('#style-prompt-title').textContent=style.name;$('#style-prompt-text').textContent=style.prompt;$('#style-prompt-viewer').hidden=false}
+function renderScriptPage(){const page=$('#page-script');if(!page)return;page.innerHTML=scriptMarkup();bindScriptEvents();updateCounts()}
+function bindScriptEvents(){
+ if(!$('#generate-script'))return;
+ $$('[data-view-script-style]').forEach(b=>b.onclick=()=>showStylePrompt(allScriptStyles().find(style=>style.id===b.dataset.viewScriptStyle)));
+ $$('[data-delete-script-style]').forEach(b=>b.onclick=()=>busy(b,async()=>{if(!confirm('Xóa phong cách riêng này?'))return;await api('script-style-delete',{styleId:b.dataset.deleteScriptStyle});await loadScriptStyles();renderScriptPage();toast('Đã xóa phong cách riêng.')},'#custom-style-status'));
+ $('#close-style-prompt').onclick=()=>$('#style-prompt-viewer').hidden=true;
+ $('#create-script-style').onclick=()=>busy($('#create-script-style'),async()=>{await api('script-style-create',{name:$('#custom-style-name').value,prompt:$('#custom-style-prompt').value});await loadScriptStyles();renderScriptPage();toast('Đã tạo phong cách riêng.')},'#custom-style-status');
+ $('#generate-script').onclick=()=>busy($('#generate-script'),async()=>{if(!S.session.providers.deepseek)throw new Error('Chức năng viết kịch bản chưa được cấu hình.');const style=currentScriptStyle();if(!style)throw new Error('Hãy chọn phong cách.');const context=$('#include-analysis').checked&&videoAsset()?.analysis?JSON.stringify(videoAsset().analysis):'';if($('#include-analysis').checked&&!context)throw new Error('Hãy phân tích video đang chọn trước khi tạo kịch bản.');const result=await api('text',{styleId:style.id,duration:Number($('#script-duration').value),context});$('#script-editor').value=result.text;saveDraft();updateCounts();$('#script-status').textContent='Đã tạo kịch bản.'},'#script-status');
+ $('#script-duration').onchange=saveDraft;
+ $$('input[name="script-style"]').forEach(el=>el.onchange=saveDraft);
+ $('#script-editor').oninput=()=>{saveDraft();updateCounts()};
+ $('#export-script').onclick=()=>download(new Blob([$('#script-editor').value],{type:'text/plain;charset=utf-8'}),'kich-ban.txt');
+ $('#script-to-voice').onclick=()=>{const value=$('#script-editor').value;if(!value.trim()||value.length>5000)return toast('Kịch bản cần 1-5.000 ký tự.',true);$('#voice-text').value=value;saveDraft();updateCounts();navigate('voice')};
 }
 function voiceMarkup(){
  const v=S.session.assignedVoice;
@@ -372,7 +401,6 @@ function renderSettings(){
  $('#provider-list').innerHTML=defs.map(([id,n,e])=>`<div class="provider"><h3>${n}</h3><span class="pill ${cfg.providers[id]?'green':''}">${cfg.providers[id]?'Đã cấu hình':'Chưa cấu hình'}</span><code>${e}</code></div>`).join('');
  $('#limiter-notice').textContent=cfg.limiter==='redis'?'Redis đã kết nối: có thể lưu phân quyền giọng cho nhiều tài khoản.':'Chưa có Upstash Redis: tạo nội dung đa tài khoản và gán giọng sẽ bị chặn để tránh vượt hạn mức.';
  $('#limiter-notice').className=`notice ${cfg.limiter==='redis'?'success':'warning'}`;
- const p=$('#text-provider')?.value||'deepseek';if($('#text-model-label'))$('#text-model-label').textContent=`${cfg.models[p]} · ${cfg.providers[p]?'đã có key':'chưa có key'}`;
  if(cfg.role==='admin')loadAdminState();
 }
 async function loadAdminState(){
@@ -414,11 +442,8 @@ function bindEvents(){
  bindCloneEvents();
  $('#analyze-btn').onclick=()=>busy($('#analyze-btn'),runAnalysis,'#analysis-status');
  $('#analysis-go-script').onclick=()=>navigate('script');
- $('#text-provider').onchange=()=>renderSettings();
- $('#generate-script').onclick=()=>busy($('#generate-script'),async()=>{const p=$('#text-provider').value;ensureProvider(p);const r=await api('text',{provider:p,prompt:$('#script-prompt').value,duration:Number($('#script-duration').value),style:$('#script-style').value,context:$('#include-analysis').checked&&videoAsset()?.analysis?JSON.stringify(videoAsset().analysis):''});$('#script-editor').value=r.text;saveDraft();updateCounts();$('#script-status').textContent='Đã tạo bằng '+r.model},'#script-status');
- for(const s of ['#script-editor','#script-prompt','#voice-text'])$(s).oninput=()=>{saveDraft();updateCounts()};
- $('#export-script').onclick=()=>download(new Blob([$('#script-editor').value],{type:'text/plain;charset=utf-8'}),'kich-ban.txt');
- $('#script-to-voice').onclick=()=>{const t=$('#script-editor').value;if(!t.trim()||t.length>5000)return toast('Kịch bản cần 1-5.000 ký tự.',true);$('#voice-text').value=t;saveDraft();updateCounts();navigate('voice')};
+ bindScriptEvents();
+ $('#voice-text').oninput=()=>{saveDraft();updateCounts()};
  $('#generate-voice').onclick=()=>busy($('#generate-voice'),async()=>{ensureProvider('vbee');requireConsent('#tts-consent');$('#voice-status').textContent='Đang gửi nội dung sang Ibee...';const sub=await api('tts-submit',{text:$('#voice-text').value,speed:Number($('#voice-speed').value),consent:true});let state=null;for(let i=0;i<120;i++){await pause(i<8?1500:2500);state=await api('tts-status',{token:sub.token});if(state.failed)throw new Error(state.error||'Ibee tạo audio thất bại.');if(state.ready)break;$('#voice-status').textContent=`Ibee đang xử lý... ${i+1}/120`}if(!state?.ready||!state.audioLink)throw new Error('Ibee xử lý lâu hơn dự kiến. Hãy thử lại sau ít phút.');const playUrl=`/api/index?action=tts-audio&token=${encodeURIComponent(sub.token)}`;const rec={id:crypto.randomUUID(),name:`ibee-${Date.now()}.mp3`,kind:'audio',playUrl,remoteUrl:state.audioLink,source:'ibee',createdAt:Date.now()};showAudio(rec);$('#voice-status').textContent=`Đã tạo bằng ${sub.voice.label}. Bấm Play để nghe trực tiếp hoặc Tải MP3.`},'#voice-status');
  $('#download-audio').onclick=()=>{if(!S.latestAudio)return;if(S.latestAudio.remoteUrl){const a=document.createElement('a');a.href=S.latestAudio.remoteUrl;a.target='_blank';a.rel='noopener noreferrer';a.download=S.latestAudio.name||'vbee-audio.mp3';document.body.appendChild(a);a.click();a.remove()}else if(S.latestAudio.blob)download(S.latestAudio.blob,S.latestAudio.name)};
  $('#refresh-settings').onclick=()=>busy($('#refresh-settings'),async()=>{S.session=await api('session');renderSettings();toast('Đã làm mới cấu hình.')});
@@ -427,10 +452,9 @@ function bindEvents(){
  $('#logout').onclick=()=>busy($('#logout'),async()=>{closeCamera();await api('logout',{});releaseUrls();S.session=null;$('#app').innerHTML='';loginScreen()});
 }
 async function boot(){
- S.session=await api('session');await initDB(S.session.username);S.assets=await all('assets');S.selectedVideo=S.assets.find(a=>a.kind==='video')?.id||null;const jobs=await all('jobs');S.cloneJob=jobs.find(j=>j.type==='video-voice-clone')||newCloneJob(S.selectedVideo||'');S.page='media';
+ S.session=await api('session');await loadScriptStyles();await initDB(S.session.username);S.assets=await all('assets');S.selectedVideo=S.assets.find(a=>a.kind==='video')?.id||null;const jobs=await all('jobs');S.cloneJob=jobs.find(j=>j.type==='video-voice-clone')||newCloneJob(S.selectedVideo||'');S.page='media';
  renderApp();bindEvents();
- try{const d=JSON.parse(localStorage.getItem(draftKey())||'{}');$('#script-prompt').value=d.prompt||'';$('#script-editor').value=d.script||'';$('#voice-text').value=d.voice||''}catch{}
- if(!S.session.providers.deepseek&&S.session.providers.openai)$('#text-provider').value='openai';
+ try{const d=JSON.parse(localStorage.getItem(draftKey())||'{}');$('#script-editor').value=d.script||'';$('#voice-text').value=d.voice||'';if(d.duration&&$('#script-duration'))$('#script-duration').value=d.duration;if(d.styleId){const style=$('input[name="script-style"][value="'+d.styleId+'"]');if(style)style.checked=true}}catch{}
  renderVideoLibrary();selectVideo(S.selectedVideo);renderCloneState();if(S.session.role==='admin')renderSettings();updateCounts();
  const latest=S.assets.filter(a=>a.kind==='audio').sort((a,b)=>b.createdAt-a.createdAt)[0];if(latest)showAudio(latest);
  ensureVideoThumbnails().then(()=>renderVideoLibrary()).catch(()=>{});
