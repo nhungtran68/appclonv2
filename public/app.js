@@ -116,12 +116,18 @@ function bindScriptEvents(){
  $('#script-to-voice').onclick=()=>{const value=$('#script-editor').value;if(!value.trim()||value.length>5000)return toast('Kịch bản cần 1-5.000 ký tự.',true);$('#voice-text').value=value;saveDraft();updateCounts();navigate('voice')};
 }
 function voiceMarkup(){
- const v=S.session.assignedVoice;
- return `<div class="hero"><div><span class="eyebrow">IBEE AIVOICE</span><h1>Giọng <span class="hero-accent">Nhân bản chuyên nghiệp.</span></h1><p>Tài khoản chỉ sử dụng giọng do admin chỉ định.</p></div><span class="pill green">IBEE</span></div><div class="grid2">
- <section class="panel"><div class="panel-head"><h2>Giọng được cấp</h2>${icon('mic')}</div><div class="notice ${v?'success':'warning'}">${v?`<strong>${esc(v.label)}</strong><br><code>${esc(v.code)}</code>`:'Admin chưa gán giọng cho tài khoản này.'}</div><div class="divider"></div><div class="field"><label>Văn bản cần đọc</label><textarea id="voice-text" rows="12" maxlength="5000"></textarea><small id="voice-count">0 / 5.000 ký tự</small></div><div class="field"><label>Tốc độ</label><select id="voice-speed"><option value="0.85">0,85x</option><option value="1" selected>1x tự nhiên</option><option value="1.15">1,15x</option></select></div><label class="check"><input id="tts-consent" type="checkbox">Tôi đồng ý gửi văn bản cho Ibee để tạo audio.</label><button id="generate-voice" class="purple full" ${v?'':'disabled'}>Tạo MP3 bằng Ibee</button><p id="voice-status" class="status-line"></p></section>
- <section class="panel"><div class="panel-head"><h2>Audio kết quả</h2><span class="pill">MP3</span></div><div id="audio-output" hidden class="audio-output"><audio id="tts-preview" controls></audio><div class="row between"><span id="audio-duration" class="pill green"></span><button id="download-audio" class="small">${icon('down')} Tải MP3</button></div></div><div class="notice">Không có mục clone giọng trên web này. Giọng được tạo và quản lý trong tài khoản Ibee, admin chỉ nhập mã giọng vào ClipLab.</div></section></div>`;
+ const choices=Array.isArray(S.session.voiceChoices)?S.session.voiceChoices:[];
+ const personal=choices.find(v=>v.kind==='personal');
+ const trend=choices.filter(v=>v.kind==='trend');
+ const options=[
+  ...(personal?[{...personal,display:'Giọng của Tôi'+(personal.label&&personal.label!=='Giọng của Tôi'?' · '+personal.label:'')}]:[]),
+  ...trend.map(v=>({...v,display:v.label}))
+ ];
+ return `<div class="hero"><div><span class="eyebrow">IBEE AIVOICE</span><h1>Chọn <span class="hero-accent">giọng phù hợp.</span></h1><p>Dùng giọng riêng được admin gán hoặc chọn một giọng Trend dùng chung.</p></div><span class="pill green">IBEE</span></div><div class="grid2">
+ <section class="panel"><div class="panel-head"><h2>Chọn giọng</h2>${icon('mic')}</div><div class="field"><label>Giọng đọc</label><select id="voice-choice" ${options.length?'':'disabled'}>${options.length?options.map((v,i)=>`<option value="${esc(v.id)}" ${i===0?'selected':''}>${esc(v.display)}</option>`).join(''):'<option>Chưa có giọng khả dụng</option>'}</select></div>${personal?'<div class="notice success"><strong>Giọng của Tôi</strong><br>'+esc(personal.label)+'</div>':'<div class="notice warning">Admin chưa gán Giọng của Tôi cho tài khoản này. Bạn vẫn có thể dùng Giọng Trend nếu có.</div>'}<div class="divider"></div><div class="field"><label>Văn bản cần đọc</label><textarea id="voice-text" rows="12" maxlength="5000"></textarea><small id="voice-count">0 / 5.000 ký tự</small></div><div class="field"><label>Tốc độ</label><select id="voice-speed"><option value="0.85">0,85x</option><option value="1" selected>1x tự nhiên</option><option value="1.15">1,15x</option></select></div><label class="check"><input id="tts-consent" type="checkbox">Tôi đồng ý gửi văn bản cho Ibee để tạo audio.</label><button id="generate-voice" class="purple full" ${options.length?'':'disabled'}>Tạo MP3 bằng Ibee</button><p id="voice-status" class="status-line"></p></section>
+ <section class="panel"><div class="panel-head"><h2>Audio kết quả</h2><span class="pill">MP3</span></div><div id="audio-output" hidden class="audio-output"><audio id="tts-preview" controls></audio><div class="row between"><span id="audio-duration" class="pill green"></span><button id="download-audio" class="small">${icon('down')} Tải MP3</button></div></div><div class="notice">Danh sách giọng chỉ hiển thị tên. Mã giọng được giữ ở máy chủ và không hiển thị cho tài khoản sử dụng.</div></section></div>`;
 }
-
+function renderVoicePage(){const page=$('#page-voice');if(!page)return;const prev=$('#voice-text')?.value||'';page.innerHTML=voiceMarkup();if($('#voice-text'))$('#voice-text').value=prev;bindVoiceEvents();updateCounts()}
 function cloneVideoMarkup(){
  const videos=S.assets.filter(a=>a.kind==='video');
  const selected=S.cloneJob?.sourceVideoId||S.selectedVideo||'';
@@ -134,8 +140,8 @@ function cloneVideoMarkup(){
  <label class="check"><input id="clone-consent" type="checkbox">Tôi có quyền sử dụng video, hình ảnh và giọng nói này; đồng ý gửi audio cần thiết cho OpenAI và Ibee. Bước ghép video chạy ngay trên trình duyệt.</label>
  <button id="clone-transcribe" class="primary full" ${selected&&voice?'':'disabled'}>Phân tích lời thoại & timeline</button><p id="clone-status" class="status-line"></p></section>
  <section class="panel"><div class="panel-head"><h2>2. Giọng đích</h2>${icon('mic')}</div>
- <div class="field"><label>Giọng Của Tôi</label><select id="clone-target-voice" ${voice?'':'disabled'}>${voice?`<option value="${esc(voice.code)}">${esc(voice.label)}</option>`:'<option>Admin chưa cấp giọng</option>'}</select></div>
- <div class="notice">Module sử dụng đúng voice code Ibee đã được admin cấp. Người dùng không thể nhập voice code khác.</div>
+ <div class="field"><label>Giọng Của Tôi</label><select id="clone-target-voice" ${voice?'':'disabled'}>${voice?`<option value="personal">${esc(voice.label)}</option>`:'<option>Admin chưa cấp giọng</option>'}</select></div>
+ <div class="notice">Video clone dùng Giọng của Tôi đã được admin gán. Mã giọng được giữ ở máy chủ.</div>
  <div class="divider"></div><div class="row between"><strong>Tiến trình</strong><span id="clone-stage" class="pill">${esc(S.cloneJob?.stage||'Chưa bắt đầu')}</span></div>
  <div class="progress"><div id="clone-progress" style="width:${Number(S.cloneJob?.progress||0)}%"></div></div></section></div>
  <section class="panel" id="clone-transcript-panel" ${S.cloneJob?.segments?.length?'':'hidden'}><div class="panel-head"><div><h2>3. Kiểm tra lời thoại</h2><p class="tiny muted status-line">Sửa sai chính tả nếu cần. Mốc thời gian được khóa để giữ timeline video.</p></div><span class="pill green" id="clone-segment-count">${S.cloneJob?.segments?.length||0} đoạn</span></div>
@@ -149,7 +155,7 @@ function settingsMarkup(){
  return `<div class="hero"><div><span class="eyebrow">CONTROL CENTER</span><h1>Thiết lập & <span class="hero-accent">phân quyền.</span></h1></div><button id="refresh-settings" class="small">${icon('refresh')} Làm mới</button></div><div class="grid2">
  <section class="panel"><div class="panel-head"><h2>Kết nối API</h2>${icon('settings')}</div><div id="provider-list" class="provider-grid"></div><div class="divider"></div><div id="limiter-notice" class="notice"></div></section>
  <section class="panel"><div class="panel-head"><h2>An toàn</h2>${icon('shield')}</div><table class="settings-table"><tbody><tr><td>Ibee</td><td>Chỉ dùng giọng admin đã cấp.</td></tr><tr><td>Tài khoản con</td><td>Không thấy API key và không tự đổi voice code.</td></tr><tr><td>Redis</td><td>Cần cho phân quyền nhiều tài khoản trên Vercel.</td></tr></tbody></table><div class="divider"></div><button id="clear-local" class="danger small">${icon('trash')} Xóa media cục bộ</button></section></div>
- ${admin?`<section class="panel admin-panel"><div class="panel-head"><h2>Admin · quản lý prompt phong cách</h2><span class="pill purple">ADMIN ONLY</span></div><div class="grid2"><div><h3>5 phong cách mặc định</h3><p class="tiny muted status-line">Admin chỉnh prompt tại đây. User chỉ được xem prompt và không thể xóa phong cách mặc định.</p><div id="admin-default-script-styles" class="stack"></div></div><div><h3>Phong cách riêng theo tài khoản</h3><p class="tiny muted status-line">Admin có thể xem phong cách riêng của từng user.</p><div id="admin-user-script-styles" class="stack"></div></div></div></section><section class="panel admin-panel"><div class="panel-head"><h2>Admin · quản lý giọng và tài khoản</h2><span class="pill purple">ADMIN ONLY</span></div><div id="openai-key-diagnostic" class="notice"></div><div class="grid2"><div><h3>Danh sách giọng Nhân bản chuyên nghiệp</h3><p class="tiny muted status-line">Copy mã giọng từ mục Giọng của tôi trên Ibee. Chỉ thêm các giọng Nhân bản chuyên nghiệp mà tài khoản Ibee của anh có quyền sử dụng.</p><div class="field"><label>Tên hiển thị</label><input id="admin-voice-label" maxlength="80" placeholder="Giọng Nhung Pro"></div><div class="field"><label>Voice code Ibee</label><input id="admin-voice-code" maxlength="180" placeholder="Mã giọng đã copy từ Ibee"></div><button id="admin-add-voice" class="primary">Thêm giọng</button><div class="divider"></div><div id="admin-voices" class="stack"></div></div><div><h3>Gán giọng theo tài khoản</h3><p class="tiny muted status-line">Mỗi tài khoản chỉ thấy và dùng giọng được chọn ở đây.</p><div id="admin-users" class="stack"></div></div></div></section>`:''}`;
+ ${admin?`<section class="panel admin-panel"><div class="panel-head"><h2>Admin · quản lý prompt phong cách</h2><span class="pill purple">ADMIN ONLY</span></div><div class="grid2"><div><h3>5 phong cách mặc định</h3><p class="tiny muted status-line">Admin chỉnh prompt tại đây. User chỉ được xem prompt và không thể xóa phong cách mặc định.</p><div id="admin-default-script-styles" class="stack"></div></div><div><h3>Phong cách riêng theo tài khoản</h3><p class="tiny muted status-line">Admin có thể xem phong cách riêng của từng user.</p><div id="admin-user-script-styles" class="stack"></div></div></div></section><section class="panel admin-panel"><div class="panel-head"><h2>Admin · quản lý giọng và tài khoản</h2><span class="pill purple">ADMIN ONLY</span></div><div id="openai-key-diagnostic" class="notice"></div><div class="grid2"><div><h3>Giọng Trend dùng chung</h3><p class="tiny muted status-line">Các giọng này xuất hiện cho tất cả tài khoản ở trang Giọng Của Tôi.</p><div class="field"><label>Tên hiển thị</label><input id="admin-trend-label" maxlength="80" placeholder="Ví dụ: Nữ trẻ trung"></div><div class="field"><label>Voice code Ibee</label><input id="admin-trend-code" maxlength="180" placeholder="Mã giọng từ Ibee"></div><button id="admin-add-trend-voice" class="primary">Thêm giọng Trend</button><div class="divider"></div><div id="admin-trend-voices" class="stack"></div></div><div><h3>Danh sách giọng Nhân bản chuyên nghiệp</h3><p class="tiny muted status-line">Copy mã giọng từ mục Giọng của tôi trên Ibee. Chỉ thêm các giọng Nhân bản chuyên nghiệp mà tài khoản Ibee của anh có quyền sử dụng.</p><div class="field"><label>Tên hiển thị</label><input id="admin-voice-label" maxlength="80" placeholder="Giọng Nhung Pro"></div><div class="field"><label>Voice code Ibee</label><input id="admin-voice-code" maxlength="180" placeholder="Mã giọng đã copy từ Ibee"></div><button id="admin-add-voice" class="primary">Thêm giọng</button><div class="divider"></div><div id="admin-voices" class="stack"></div></div><div><h3>Gán giọng theo tài khoản</h3><p class="tiny muted status-line">Mỗi tài khoản chỉ thấy và dùng giọng được chọn ở đây.</p><div id="admin-users" class="stack"></div></div></div></section>`:''}`;
 }
 function renderApp(){
  $('#login-screen').hidden=true;$('#app').hidden=false;
@@ -163,7 +169,7 @@ function navigate(page){
  for(const p of Object.keys(pages))$('#page-'+p).hidden=p!==page;
  $$('.nav [data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===page));
  $('#breadcrumb').textContent=pages[page];window.scrollTo({top:0});
- if(page==='settings')renderSettings();if(page==='clone')renderCloneState();
+ if(page==='settings')renderSettings();if(page==='clone')renderCloneState();if(page==='voice'){api('session').then(s=>{S.session=s;renderVoicePage()}).catch(()=>{})}
 }
 function videoAsset(){return S.assets.find(a=>a.id===S.selectedVideo&&a.kind==='video')}
 function requireConsent(sel){if(!$(sel).checked)throw new Error('Hãy xác nhận quyền sử dụng dữ liệu.')}
@@ -348,7 +354,7 @@ async function synthesizeCloneSegment(seg,index,total,initialSpeed=1){
  const tolerance=Math.max(.07,target*.025);
  for(let attempt=0;attempt<3;attempt++){
   setCloneProgress('Tạo giọng Ibee',52+Math.round((index+(attempt*.22))/total*30),`Đoạn ${index+1}/${total}: căn thời lượng ${speed.toFixed(2)}x...`);
-  const sub=await api('tts-submit',{text:seg.text,speed,consent:true});
+  const sub=await api('tts-submit',{text:seg.text,speed,voiceChoice:'personal',consent:true});
   await waitIbee(sub.token,`Đoạn ${index+1}/${total}`);
   const raw=await fetchIbeeAudio(sub.token);
   const speech=await trimSpeechAudio(raw);
@@ -423,6 +429,7 @@ async function loadAdminState(){
 function renderAdmin(){
  if(!S.adminState)return;
  const voices=Array.isArray(S.adminState.voices)?S.adminState.voices:[];
+ const trendVoices=Array.isArray(S.adminState.trendVoices)?S.adminState.trendVoices:[];
  const users=Array.isArray(S.adminState.users)?S.adminState.users:[];
  const oa=S.adminState.diagnostics?.openai;
  const voiceBox=$('#admin-voices'),userBox=$('#admin-users');
@@ -430,6 +437,8 @@ function renderAdmin(){
  const diagnostic=$('#openai-key-diagnostic');
  if(diagnostic){diagnostic.className='notice '+(oa?.configured?'success':'warning');diagnostic.textContent=oa?.configured?'Khóa dịch vụ phụ trợ đã được cấu hình.':'Khóa dịch vụ phụ trợ chưa được cấu hình.'}
  voiceBox.innerHTML=voices.length?voices.map(v=>'<div class="voice-card"><div class="row between"><div><strong>'+esc(v?.label||'Giọng')+'</strong><br><code>'+esc(v?.code||'')+'</code></div><button class="small danger" data-remove-pro-voice="'+esc(v?.code||'')+'">Xóa</button></div></div>').join(''):'<div class="empty">Chưa thêm giọng chuyên nghiệp.</div>';
+ const trendBox=$('#admin-trend-voices');
+ if(trendBox)trendBox.innerHTML=trendVoices.length?trendVoices.map(v=>'<div class="voice-card"><div class="row between"><div><strong>'+esc(v?.label||'Giọng Trend')+'</strong><br><code>'+esc(v?.code||'')+'</code></div><button class="small danger" data-remove-trend-voice="'+esc(v?.id||'')+'">Xóa</button></div></div>').join(''):'<div class="empty">Chưa có giọng Trend.</div>';
  userBox.innerHTML=users.map(u=>'<div class="voice-card"><div class="row between"><strong>'+esc(u?.username||'')+'</strong><span class="pill">'+esc(u?.role||'member')+'</span></div><div class="field"><select data-assign-user="'+esc(u?.username||'')+'"><option value="">-- Chưa cấp giọng --</option>'+voices.map(v=>'<option value="'+esc(v?.code||'')+'" '+(u?.voiceCode===v?.code?'selected':'')+'>'+esc(v?.label||'Giọng')+'</option>').join('')+'</select></div></div>').join('');
  const rawStyleState=S.adminState.scriptStyles;
  const styleState=rawStyleState&&typeof rawStyleState==='object'?rawStyleState:{};
@@ -458,6 +467,13 @@ function bindCloneEvents(){
  const dl=$('#clone-download-result');if(dl)dl.onclick=()=>{const v=S.cloneJob?.resultVideo;if(v?.blob)download(v.blob,v.name||'video-clon-giong.webm')};
  const source=$('#clone-source-video');if(source)source.onchange=async e=>{const id=e.target.value;if(!S.cloneJob||S.cloneJob.sourceVideoId!==id){S.cloneJob=newCloneJob(id);await saveCloneJob();const page=$('#page-clone');page.innerHTML=cloneVideoMarkup();bindCloneEvents();renderCloneState()}};
 }
+function bindVoiceEvents(){
+ const textBox=$('#voice-text'),generate=$('#generate-voice'),downloadButton=$('#download-audio');
+ if(textBox)textBox.oninput=()=>{saveDraft();updateCounts()};
+ if(generate)generate.onclick=()=>busy(generate,async()=>{ensureProvider('vbee');requireConsent('#tts-consent');$('#voice-status').textContent='Đang gửi nội dung sang Ibee...';const sub=await api('tts-submit',{text:textBox.value,speed:Number($('#voice-speed').value),voiceChoice:$('#voice-choice')?.value||'personal',consent:true});let state=null;for(let i=0;i<120;i++){await pause(i<8?1500:2500);state=await api('tts-status',{token:sub.token});if(state.failed)throw new Error(state.error||'Ibee tạo audio thất bại.');if(state.ready)break;$('#voice-status').textContent=`Ibee đang xử lý... ${i+1}/120`}if(!state?.ready||!state.audioLink)throw new Error('Ibee xử lý lâu hơn dự kiến. Hãy thử lại sau ít phút.');const playUrl=`/api/index?action=tts-audio&token=${encodeURIComponent(sub.token)}`;const rec={id:crypto.randomUUID(),name:`ibee-${Date.now()}.mp3`,kind:'audio',playUrl,remoteUrl:state.audioLink,source:'ibee',createdAt:Date.now()};showAudio(rec);$('#voice-status').textContent=`Đã tạo bằng ${sub.voice.label}. Bấm Play để nghe trực tiếp hoặc Tải MP3.`},'#voice-status');
+ if(downloadButton)downloadButton.onclick=()=>{if(!S.latestAudio)return;if(S.latestAudio.remoteUrl){const a=document.createElement('a');a.href=S.latestAudio.remoteUrl;a.target='_blank';a.rel='noopener noreferrer';a.download=S.latestAudio.name||'vbee-audio.mp3';document.body.appendChild(a);a.click();a.remove()}else if(S.latestAudio.blob)download(S.latestAudio.blob,S.latestAudio.name)};
+}
+
 function bindEvents(){
  $('#app').onclick=e=>{
   const b=e.target.closest('button');if(!b)return;
@@ -465,6 +481,7 @@ function bindEvents(){
   if(b.dataset.selectVideo)return selectVideo(b.dataset.selectVideo);
   if(b.dataset.deleteAsset)return busy(b,async()=>{await remove('assets',b.dataset.deleteAsset);S.assets=await all('assets');if(S.selectedVideo===b.dataset.deleteAsset)S.selectedVideo=S.assets.find(a=>a.kind==='video')?.id||null;selectVideo(S.selectedVideo)});
   if(b.dataset.removeProVoice)return busy(b,async()=>{await api('admin-remove-voice',{code:b.dataset.removeProVoice});await loadAdminState();toast('Đã xóa giọng khỏi danh sách.')});
+  if(b.dataset.removeTrendVoice)return busy(b,async()=>{await api('admin-remove-trend-voice',{id:b.dataset.removeTrendVoice});await loadAdminState();S.session=await api('session');renderVoicePage();toast('Đã xóa giọng Trend.')});
  };
  $('#app').onchange=e=>{const el=e.target.closest('[data-assign-user]');if(!el)return;const username=el.dataset.assignUser,voiceCode=el.value;el.disabled=true;(async()=>{try{await api('admin-assign-voice',{username,voiceCode});await loadAdminState();if(username===S.session.username)S.session=await api('session');toast('Đã cập nhật giọng cho '+username)}catch(err){toast(err.message||'Không thể cập nhật giọng.',true);await loadAdminState()}finally{if(document.body.contains(el))el.disabled=false}})()};
  $('#open-camera').onclick=()=>busy($('#open-camera'),async()=>{const portrait=$('#camera-ratio').value==='portrait';applyCameraRatioUI();const stream=await S.camera.open({facing:$('#camera-facing').value,portrait,audio:$('#camera-audio').checked});const p=$('#camera-video');p.removeAttribute('src');p.srcObject=stream;p.controls=false;p.muted=true;await p.play();$('#camera-empty').hidden=true;$('#start-record').disabled=false;$('#close-camera').hidden=false;$('#camera-status').textContent=portrait?'Camera dọc 9:16 đã sẵn sàng với khung hình tự nhiên.':'Camera đã sẵn sàng.'});
@@ -477,11 +494,10 @@ function bindEvents(){
  $('#analyze-btn').onclick=()=>busy($('#analyze-btn'),runAnalysis,'#analysis-status');
  $('#analysis-go-script').onclick=()=>navigate('script');
  bindScriptEvents();
- $('#voice-text').oninput=()=>{saveDraft();updateCounts()};
- $('#generate-voice').onclick=()=>busy($('#generate-voice'),async()=>{ensureProvider('vbee');requireConsent('#tts-consent');$('#voice-status').textContent='Đang gửi nội dung sang Ibee...';const sub=await api('tts-submit',{text:$('#voice-text').value,speed:Number($('#voice-speed').value),consent:true});let state=null;for(let i=0;i<120;i++){await pause(i<8?1500:2500);state=await api('tts-status',{token:sub.token});if(state.failed)throw new Error(state.error||'Ibee tạo audio thất bại.');if(state.ready)break;$('#voice-status').textContent=`Ibee đang xử lý... ${i+1}/120`}if(!state?.ready||!state.audioLink)throw new Error('Ibee xử lý lâu hơn dự kiến. Hãy thử lại sau ít phút.');const playUrl=`/api/index?action=tts-audio&token=${encodeURIComponent(sub.token)}`;const rec={id:crypto.randomUUID(),name:`ibee-${Date.now()}.mp3`,kind:'audio',playUrl,remoteUrl:state.audioLink,source:'ibee',createdAt:Date.now()};showAudio(rec);$('#voice-status').textContent=`Đã tạo bằng ${sub.voice.label}. Bấm Play để nghe trực tiếp hoặc Tải MP3.`},'#voice-status');
- $('#download-audio').onclick=()=>{if(!S.latestAudio)return;if(S.latestAudio.remoteUrl){const a=document.createElement('a');a.href=S.latestAudio.remoteUrl;a.target='_blank';a.rel='noopener noreferrer';a.download=S.latestAudio.name||'vbee-audio.mp3';document.body.appendChild(a);a.click();a.remove()}else if(S.latestAudio.blob)download(S.latestAudio.blob,S.latestAudio.name)};
+ bindVoiceEvents();
  $('#refresh-settings').onclick=()=>busy($('#refresh-settings'),async()=>{S.session=await api('session');renderSettings();toast('Đã làm mới cấu hình.')});
  $('#clear-local').onclick=()=>busy($('#clear-local'),async()=>{if(!confirm('Xóa toàn bộ video/audio/job lưu trên trình duyệt của tài khoản này?'))return;await clear('assets');await clear('jobs');S.assets=[];S.selectedVideo=null;S.latestAudio=null;S.cloneJob=newCloneJob();renderVideoLibrary();selectVideo(null);renderCloneState();$('#audio-output')?.setAttribute('hidden','')});
+ if($('#admin-add-trend-voice'))$('#admin-add-trend-voice').onclick=()=>busy($('#admin-add-trend-voice'),async()=>{await api('admin-add-trend-voice',{label:$('#admin-trend-label').value,code:$('#admin-trend-code').value});$('#admin-trend-label').value='';$('#admin-trend-code').value='';await loadAdminState();S.session=await api('session');renderVoicePage();toast('Đã thêm giọng Trend cho tất cả tài khoản.')});
  if($('#admin-add-voice'))$('#admin-add-voice').onclick=()=>busy($('#admin-add-voice'),async()=>{await api('admin-add-voice',{label:$('#admin-voice-label').value,code:$('#admin-voice-code').value});$('#admin-voice-label').value='';$('#admin-voice-code').value='';await loadAdminState();toast('Đã thêm giọng Ibee chuyên nghiệp.')});
  $('#logout').onclick=()=>busy($('#logout'),async()=>{closeCamera();await api('logout',{});releaseUrls();S.session=null;$('#app').innerHTML='';loginScreen()});
 }
