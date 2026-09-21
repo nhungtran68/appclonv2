@@ -49,7 +49,7 @@ async function busy(button,fn,statusSel){
 }
 function draftKey(){return `cliplab-draft-${S.session.username}`;}
 function saveDraft(){
-  try{localStorage.setItem(draftKey(),JSON.stringify({script:$('#script-editor')?.value||'',voice:$('#voice-text')?.value||'',duration:$('#script-duration')?.value||'60',styleId:$('#script-style')?.value||''}))}catch{}
+  try{localStorage.setItem(draftKey(),JSON.stringify({script:$('#script-editor')?.value||'',voice:$('#voice-text')?.value||'',duration:$('#script-duration')?.value||'60',styleId:$('#script-style')?.value||'',includeAnalysis:$('#include-analysis')?.checked??true,title:$('#script-title')?.value||''}))}catch{}
 }
 function loginScreen(){
   $('#app').hidden=true;$('#login-screen').hidden=false;
@@ -77,7 +77,7 @@ function scriptMarkup(){
  '<div class="field"><label>Phong cách</label><div class="script-style-select-row"><select id="script-style">'+options+'</select><button type="button" id="view-style-prompt" class="small">Xem Prompt</button></div></div>'+
  '<div id="style-prompt-viewer" class="notice" hidden><div class="row between"><strong id="style-prompt-title">Prompt phong cách</strong><button type="button" id="close-style-prompt" class="small">Đóng</button></div><div id="style-prompt-text" class="prompt-preview"></div></div>'+
  '<details class="custom-style-builder"><summary>+ Tạo phong cách riêng</summary><input id="custom-style-id" type="hidden"><div class="field"><label>Tên phong cách</label><input id="custom-style-name" maxlength="80" placeholder="Ví dụ: Review chân thật"></div><div class="field"><label>Prompt</label><textarea id="custom-style-prompt" rows="6" maxlength="6000" placeholder="Mô tả cách viết, giọng điệu, cấu trúc mở đầu, cách kết thúc..."></textarea></div><div class="row"><button type="button" id="create-script-style" class="primary">Lưu phong cách</button><button type="button" id="cancel-edit-script-style" class="small" hidden>Hủy sửa</button></div><p id="custom-style-status" class="status-line"></p>'+customList+'</details>'+
- '<label class="check"><input id="include-analysis" type="checkbox" checked>Dùng kết quả phân tích video đang chọn.</label><button id="generate-script" class="primary full">Tạo kịch bản</button><p id="script-status" class="status-line"></p></section>'+
+ '<label class="check"><input id="include-analysis" type="checkbox" checked>Dùng kết quả phân tích video đang chọn.</label><div class="field" id="script-title-field" hidden><label>Tiêu đề / chủ đề mong muốn</label><input id="script-title" maxlength="300" placeholder="Ví dụ: 3 lý do nên trồng nho trên sân thượng"></div><button id="generate-script" class="primary full">Tạo kịch bản</button><p id="script-status" class="status-line"></p></section>'+
  '<section class="panel"><div class="field"><label>Bản thảo</label><textarea id="script-editor" class="script-area" rows="17"></textarea></div><div class="row between"><span id="script-count" class="char-count">0 ký tự</span><button id="export-script" class="small">'+icon('down')+' TXT</button></div><div class="divider"></div><button id="script-to-voice" class="purple full">Đưa sang tạo giọng Ibee</button></section></div>';
 }
 async function loadScriptStyles(){S.scriptStyles=await api('script-styles')}
@@ -89,18 +89,21 @@ function showStylePrompt(style){
  if(!title||!textBox||!viewer)return;
  title.textContent=style.name;textBox.textContent=style.prompt;viewer.hidden=false;
 }
+function syncScriptSourceMode(){const useAnalysis=$('#include-analysis')?.checked??true;const field=$('#script-title-field'),input=$('#script-title');if(field)field.hidden=useAnalysis;if(input)input.required=!useAnalysis}
 function renderScriptPage(){
  const page=$('#page-script');if(!page)return;
- const prev={script:$('#script-editor')?.value||'',duration:$('#script-duration')?.value||'60',styleId:$('#script-style')?.value||'',includeAnalysis:$('#include-analysis')?.checked??true};
+ const prev={script:$('#script-editor')?.value||'',duration:$('#script-duration')?.value||'60',styleId:$('#script-style')?.value||'',includeAnalysis:$('#include-analysis')?.checked??true,title:$('#script-title')?.value||''};
  page.innerHTML=scriptMarkup();
  if($('#script-editor'))$('#script-editor').value=prev.script;
  if($('#script-duration'))$('#script-duration').value=prev.duration;
  if(prev.styleId&&$('#script-style')&&allScriptStyles().some(style=>style.id===prev.styleId))$('#script-style').value=prev.styleId;
  if($('#include-analysis'))$('#include-analysis').checked=prev.includeAnalysis;
- bindScriptEvents();updateCounts();
+ if($('#script-title'))$('#script-title').value=prev.title;
+ syncScriptSourceMode();bindScriptEvents();updateCounts();
 }
 function bindScriptEvents(){
  if(!$('#generate-script'))return;
+ syncScriptSourceMode();
  $('#view-style-prompt').onclick=()=>showStylePrompt(currentScriptStyle());
  const resetCustomStyleForm=()=>{$('#custom-style-id').value='';$('#custom-style-name').value='';$('#custom-style-prompt').value='';$('#create-script-style').textContent='Lưu phong cách';$('#cancel-edit-script-style').hidden=true};
  $$('[data-edit-script-style]').forEach(b=>b.onclick=()=>{const style=(S.scriptStyles.custom||[]).find(x=>x.id===b.dataset.editScriptStyle);if(!style)return;const details=$('.custom-style-builder');details.open=true;$('#custom-style-id').value=style.id;$('#custom-style-name').value=style.name;$('#custom-style-prompt').value=style.prompt;$('#create-script-style').textContent='Cập nhật phong cách';$('#cancel-edit-script-style').hidden=false;$('#custom-style-name').focus()});
@@ -108,8 +111,10 @@ function bindScriptEvents(){
  $('#cancel-edit-script-style').onclick=resetCustomStyleForm;
  $('#close-style-prompt').onclick=()=>$('#style-prompt-viewer').hidden=true;
  $('#create-script-style').onclick=()=>busy($('#create-script-style'),async()=>{const styleId=$('#custom-style-id').value,name=$('#custom-style-name').value,prompt=$('#custom-style-prompt').value;if(styleId)await api('script-style-update',{styleId,name,prompt});else await api('script-style-create',{name,prompt});await loadScriptStyles();renderScriptPage();toast(styleId?'Đã cập nhật phong cách riêng.':'Đã tạo phong cách riêng.')},'#custom-style-status');
- $('#generate-script').onclick=()=>busy($('#generate-script'),async()=>{if(!S.session.providers.deepseek)throw new Error('Chức năng viết kịch bản chưa được cấu hình.');const style=currentScriptStyle();if(!style)throw new Error('Hãy chọn phong cách.');const context=$('#include-analysis').checked&&videoAsset()?.analysis?JSON.stringify(videoAsset().analysis):'';if($('#include-analysis').checked&&!context)throw new Error('Hãy phân tích video đang chọn trước khi tạo kịch bản.');const result=await api('text',{styleId:style.id,duration:Number($('#script-duration').value),context});$('#script-editor').value=result.text;saveDraft();updateCounts();$('#script-status').textContent='Đã tạo kịch bản.'},'#script-status');
+ $('#generate-script').onclick=()=>busy($('#generate-script'),async()=>{if(!S.session.providers.deepseek)throw new Error('Chức năng viết kịch bản chưa được cấu hình.');const style=currentScriptStyle();if(!style)throw new Error('Hãy chọn phong cách.');const useAnalysis=$('#include-analysis').checked;const context=useAnalysis&&videoAsset()?.analysis?JSON.stringify(videoAsset().analysis):'';const title=useAnalysis?'':($('#script-title')?.value||'').trim();if(useAnalysis&&!context)throw new Error('Hãy phân tích video đang chọn trước khi tạo kịch bản.');if(!useAnalysis&&!title){$('#script-title')?.focus();throw new Error('Hãy nhập tiêu đề hoặc chủ đề mong muốn.')}const result=await api('text',{styleId:style.id,duration:Number($('#script-duration').value),context,title});$('#script-editor').value=result.text;saveDraft();updateCounts();$('#script-status').textContent='Đã tạo kịch bản.'},'#script-status');
  $('#script-duration').onchange=saveDraft;
+ $('#include-analysis').onchange=()=>{syncScriptSourceMode();saveDraft()};
+ $('#script-title').oninput=saveDraft;
  $('#script-style').onchange=()=>{saveDraft();$('#style-prompt-viewer').hidden=true};
  $('#script-editor').oninput=()=>{saveDraft();updateCounts()};
  $('#export-script').onclick=()=>download(new Blob([$('#script-editor').value],{type:'text/plain;charset=utf-8'}),'kich-ban.txt');
@@ -504,7 +509,7 @@ function bindEvents(){
 async function boot(){
  S.session=await api('session');await loadScriptStyles();await initDB(S.session.username);S.assets=await all('assets');S.selectedVideo=S.assets.find(a=>a.kind==='video')?.id||null;const jobs=await all('jobs');S.cloneJob=jobs.find(j=>j.type==='video-voice-clone')||newCloneJob(S.selectedVideo||'');S.page='media';
  renderApp();bindEvents();
- try{const d=JSON.parse(localStorage.getItem(draftKey())||'{}');$('#script-editor').value=d.script||'';$('#voice-text').value=d.voice||'';if(d.duration&&$('#script-duration'))$('#script-duration').value=d.duration;if(d.styleId&&$('#script-style'))$('#script-style').value=d.styleId}catch{}
+ try{const d=JSON.parse(localStorage.getItem(draftKey())||'{}');$('#script-editor').value=d.script||'';$('#voice-text').value=d.voice||'';if(d.duration&&$('#script-duration'))$('#script-duration').value=d.duration;if(d.styleId&&$('#script-style'))$('#script-style').value=d.styleId;if(typeof d.includeAnalysis==='boolean'&&$('#include-analysis'))$('#include-analysis').checked=d.includeAnalysis;if($('#script-title'))$('#script-title').value=d.title||'';syncScriptSourceMode()}catch{}
  renderVideoLibrary();selectVideo(S.selectedVideo);renderCloneState();if(S.session.role==='admin')renderSettings();updateCounts();
  const latest=S.assets.filter(a=>a.kind==='audio').sort((a,b)=>b.createdAt-a.createdAt)[0];if(latest)showAudio(latest);
  ensureVideoThumbnails().then(()=>renderVideoLibrary()).catch(()=>{});
