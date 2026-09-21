@@ -69,9 +69,17 @@ test('Ibee player uses authenticated same-origin audio proxy with range support'
 });
 
 
+test('member accounts cannot see or navigate to video voice clone',async()=>{
+  const source=await readFile('public/app.js','utf8');
+  assert.match(source,/\['settings','clone'\]\.includes\(page\)\|\|S\.session\?\.role==='admin'/);
+  assert.match(source,/filter\(\(\[p\]\)=>canOpenPage\(p\)\)/);
+  assert.match(source,/\$\{canOpenPage\('clone'\)\?cloneVideoMarkup\(\):''\}/);
+  assert.match(source,/if\(canOpenPage\('clone'\)\)renderCloneState\(\)/);
+});
+
 test('member accounts cannot see or navigate to Settings',async()=>{
   const source=await readFile('public/app.js','utf8');
-  assert.match(source,/const canOpenPage=page=>page!=='settings'\|\|S\.session\?\.role==='admin'/);
+  assert.match(source,/const canOpenPage=page=>!\['settings','clone'\]\.includes\(page\)\|\|S\.session\?\.role==='admin'/);
   assert.match(source,/filter\(\(\[p\]\)=>canOpenPage\(p\)\)/);
   assert.match(source,/!canOpenPage\(page\)/);
   assert.match(source,/if\(S\.session\.role==='admin'\)renderSettings\(\)/);
