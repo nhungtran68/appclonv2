@@ -215,6 +215,19 @@ test('media page removes live camera switching and emphasizes orange open/record
   assert.match(frontend,/Đã chọn .*Bấm Mở camera để áp dụng/);
 });
 
+test('video analysis accepts a short product or service identification hint',async()=>{
+  const frontend=await readFile('public/app.js','utf8');
+  const providers=await readFile('lib/providers.mjs','utf8');
+  assert.match(frontend,/id="analysis-subject-hint"/);
+  assert.match(frontend,/Thông tin sản phẩm \/ dịch vụ/);
+  assert.match(frontend,/maxlength="300"/);
+  assert.match(frontend,/subjectHint/);
+  assert.match(frontend,/analysisSubjectHint/);
+  assert.match(providers,/const subjectHint = text\(b\.subjectHint \|\| '', 'Thông tin sản phẩm \/ dịch vụ', 300, 0\)/);
+  assert.match(providers,/Ngữ cảnh nhận diện do người dùng cung cấp/);
+  assert.match(providers,/chỉ là gợi ý để nhận diện đúng/);
+});
+
 test('analysis panel uses automatic sensitivity and removes custom analysis request',async()=>{
   const frontend=await readFile('public/app.js','utf8');
   const start=frontend.indexOf('function mediaMarkup(){');
