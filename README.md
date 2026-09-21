@@ -13,7 +13,7 @@ Fish Voice và Fish Lip Sync đã được gỡ khỏi ứng dụng.
 
 ## Tài khoản
 
-Tạm thời, tài khoản `admin` đăng nhập chỉ bằng tên `admin`, không cần nhập mật khẩu. `APP_PASSWORD` vẫn được giữ ở máy chủ để duy trì cấu hình/session và có thể bật lại xác thực mật khẩu sau.
+Admin đăng nhập bằng tên `admin` và mật khẩu `APP_PASSWORD` được cấu hình trên Vercel.
 
 Repo có sẵn 10 tài khoản con `user01` đến `user10`. Chỉ password hash được commit; mật khẩu gốc được bàn giao riêng cho chủ dự án.
 
