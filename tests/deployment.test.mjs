@@ -215,14 +215,16 @@ test('media page removes live camera switching and emphasizes orange open/record
   assert.match(frontend,/Đã chọn .*Bấm Mở camera để áp dụng/);
 });
 
-test('analysis panel uses automatic sensitivity and removes custom analysis request',async()=>{
+test('analysis panel keeps automatic sensitivity and accepts optional product context',async()=>{
   const frontend=await readFile('public/app.js','utf8');
   const start=frontend.indexOf('function mediaMarkup(){');
   const end=frontend.indexOf('function scriptMarkup(){',start);
   const mediaMarkup=frontend.slice(start,end);
-  assert.doesNotMatch(mediaMarkup,/scene-sensitivity|Độ nhạy chuyển cảnh|analysis-brief|Yêu cầu phân tích/);
+  assert.doesNotMatch(mediaMarkup,/scene-sensitivity|Độ nhạy chuyển cảnh|Yêu cầu phân tích/);
+  assert.match(mediaMarkup,/id="analysis-brief"/);
+  assert.match(mediaMarkup,/Thông tin chính xác cho AI/);
   assert.match(frontend,/sensitivity:'auto'/);
-  assert.match(frontend,/brief:''/);
+  assert.match(frontend,/brief:\(\$\('#analysis-brief'\)\?\.value\|\|''\)\.trim\(\)/);
 });
 
 test('media page hides provider branding and detailed analysis output',async()=>{
