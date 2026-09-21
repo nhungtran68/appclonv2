@@ -28,6 +28,17 @@ test('admin login requires APP_PASSWORD and exposes provider state without secre
   const d=await (await req('session')).json(); assert.equal(d.username,'admin'); assert.equal(d.role,'admin'); assert.ok('vbee' in d.providers); assert.equal(d.providers.deepseek,true); assert.ok(!('google' in d.providers)); assert.ok(!('sync' in d.providers)); assert.ok(!('fish' in d.providers)); assert.ok(!('lipSync' in d));
   assert.ok(!JSON.stringify(d).includes(process.env.SESSION_SECRET));
 });
+test('script styles expose five defaults and private style creation fails closed without Redis',async()=>{
+  const stylesResponse=await req('script-styles');
+  assert.equal(stylesResponse.status,200);
+  const styles=await stylesResponse.json();
+  assert.equal(styles.defaults.length,5);
+  assert.deepEqual(styles.custom,[]);
+  const create=await req('script-style-create',{name:'Của tôi',prompt:'Viết ngắn và tự nhiên'});
+  assert.equal(create.status,503);
+  assert.equal((await create.json()).code,'REDIS_REQUIRED');
+});
+
 test('admin state lists ten children plus admin',async()=>{
   const r=await req('admin-state',{}); assert.equal(r.status,200); const d=await r.json(); assert.equal(d.users.length,11); assert.equal(d.redis,false); assert.equal(d.diagnostics.openai.hint,'sk-proj-…9CgA'); assert.ok(!JSON.stringify(d).includes('sk-proj-testkey-9CgA'));
 });
