@@ -26,7 +26,7 @@ const clock=s=>`${String(Math.floor((s||0)/60)).padStart(2,'0')}:${String(Math.f
 const size=b=>(b/1024/1024).toFixed(1)+' MB';
 const S={session:null,page:'media',assets:[],selectedVideo:null,camera:new Recorder(),progress:new Set(),latestAudio:null,adminState:null,cloneJob:null,scriptStyles:{defaults:[],custom:[]}};
 const pages={media:'Tư liệu video',script:'Viết kịch bản',voice:'Giọng Của Tôi',clone:'Clon giọng Video',settings:'Thiết lập'};
-const canOpenPage=page=>page!=='settings'||S.session?.role==='admin';
+const canOpenPage=page=>!['settings','clone'].includes(page)||S.session?.role==='admin';
 let toastTimer;
 
 function toast(message,error=false){
@@ -166,7 +166,7 @@ function renderApp(){
  $('#login-screen').hidden=true;$('#app').hidden=false;
  const navItems=[['media',pages.media,'video'],['script',pages.script,'pen'],['voice',pages.voice,'mic'],['clone',pages.clone,'magic'],['settings',pages.settings,'settings']].filter(([p])=>canOpenPage(p));
  const nav=navItems.map(([p,label,ico])=>`<button data-page="${p}" class="${p==='media'?'active':''}">${icon(ico)}<span>${label}</span></button>`).join('');
- $('#app').innerHTML=`<aside class="sidebar"><div class="brand">${logo}<div><strong>cliplab<span class="hero-accent">.</span></strong><small>IBEE CREATOR STUDIO</small></div></div><div class="workspace"><span class="avatar">${esc(S.session.username.slice(0,2).toUpperCase())}</span><div><strong>${esc(S.session.username)}</strong><p class="tiny muted">${esc(S.session.role)}</p></div></div><p class="nav-label">CHỨC NĂNG</p><nav class="nav">${nav}</nav><div class="sidebar-bottom"><div class="free-card"><span class="pill green">IBEE API</span><h3>Giọng theo phân quyền</h3><p>Admin cấp giọng cho từng tài khoản con.</p></div></div></aside><main class="main"><header class="topbar"><div class="crumb"><strong id="breadcrumb">Tư liệu video</strong></div><div class="user-badge"><span class="pill ${S.session.role==='admin'?'purple':'green'}">${esc(S.session.role)}</span><strong>${esc(S.session.username)}</strong><button id="logout" class="small">${icon('logout')}</button></div></header><div class="content"><div id="page-media">${mediaMarkup()}</div><div id="page-script" hidden>${scriptMarkup()}</div><div id="page-voice" hidden>${voiceMarkup()}</div><div id="page-clone" hidden>${cloneVideoMarkup()}</div><div id="page-settings" hidden>${settingsMarkup()}</div></div></main>`;
+ $('#app').innerHTML=`<aside class="sidebar"><div class="brand">${logo}<div><strong>cliplab<span class="hero-accent">.</span></strong><small>IBEE CREATOR STUDIO</small></div></div><div class="workspace"><span class="avatar">${esc(S.session.username.slice(0,2).toUpperCase())}</span><div><strong>${esc(S.session.username)}</strong><p class="tiny muted">${esc(S.session.role)}</p></div></div><p class="nav-label">CHỨC NĂNG</p><nav class="nav">${nav}</nav><div class="sidebar-bottom"><div class="free-card"><span class="pill green">IBEE API</span><h3>Giọng theo phân quyền</h3><p>Admin cấp giọng cho từng tài khoản con.</p></div></div></aside><main class="main"><header class="topbar"><div class="crumb"><strong id="breadcrumb">Tư liệu video</strong></div><div class="user-badge"><span class="pill ${S.session.role==='admin'?'purple':'green'}">${esc(S.session.role)}</span><strong>${esc(S.session.username)}</strong><button id="logout" class="small">${icon('logout')}</button></div></header><div class="content"><div id="page-media">${mediaMarkup()}</div><div id="page-script" hidden>${scriptMarkup()}</div><div id="page-voice" hidden>${voiceMarkup()}</div><div id="page-clone" hidden>${canOpenPage('clone')?cloneVideoMarkup():''}</div><div id="page-settings" hidden>${settingsMarkup()}</div></div></main>`;
 }
 function navigate(page){
  if(!pages[page]||!canOpenPage(page)||S.camera.recording)return;
@@ -510,7 +510,7 @@ async function boot(){
  S.session=await api('session');await loadScriptStyles();await initDB(S.session.username);S.assets=await all('assets');S.selectedVideo=S.assets.find(a=>a.kind==='video')?.id||null;const jobs=await all('jobs');S.cloneJob=jobs.find(j=>j.type==='video-voice-clone')||newCloneJob(S.selectedVideo||'');S.page='media';
  renderApp();bindEvents();
  try{const d=JSON.parse(localStorage.getItem(draftKey())||'{}');$('#script-editor').value=d.script||'';$('#voice-text').value=d.voice||'';if(d.duration&&$('#script-duration'))$('#script-duration').value=d.duration;if(d.styleId&&$('#script-style'))$('#script-style').value=d.styleId;if(typeof d.includeAnalysis==='boolean'&&$('#include-analysis'))$('#include-analysis').checked=d.includeAnalysis;if($('#script-title'))$('#script-title').value=d.title||'';syncScriptSourceMode()}catch{}
- renderVideoLibrary();selectVideo(S.selectedVideo);renderCloneState();if(S.session.role==='admin')renderSettings();updateCounts();
+ renderVideoLibrary();selectVideo(S.selectedVideo);if(canOpenPage('clone'))renderCloneState();if(S.session.role==='admin')renderSettings();updateCounts();
  const latest=S.assets.filter(a=>a.kind==='audio').sort((a,b)=>b.createdAt-a.createdAt)[0];if(latest)showAudio(latest);
  ensureVideoThumbnails().then(()=>renderVideoLibrary()).catch(()=>{});
 }
