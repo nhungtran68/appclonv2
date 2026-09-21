@@ -327,6 +327,34 @@ test('admin and custom-style bindings are null-safe',async()=>{
   assert.match(source,/includeAnalysis:\$\('#include-analysis'\)\?\.checked\?\?true/);
 });
 
+test('trend voices are shared by name while user-facing voice codes stay hidden',async()=>{
+  const frontend=await readFile('public/app.js','utf8');
+  const api=await readFile('api/index.js','utf8');
+  const providers=await readFile('lib/providers.mjs','utf8');
+  const voiceStart=frontend.indexOf('function voiceMarkup(){');
+  const voiceEnd=frontend.indexOf('function renderVoicePage',voiceStart);
+  const voiceMarkup=frontend.slice(voiceStart,voiceEnd);
+  const cloneStart=frontend.indexOf('function cloneVideoMarkup(){');
+  const cloneEnd=frontend.indexOf('function settingsMarkup(){',cloneStart);
+  const cloneMarkup=frontend.slice(cloneStart,cloneEnd);
+  assert.match(frontend,/admin-add-trend-voice/);
+  assert.match(frontend,/admin-trend-voices/);
+  assert.match(frontend,/id="voice-choice"/);
+  assert.match(frontend,/Giọng của Tôi/);
+  assert.match(frontend,/Giọng Trend/);
+  assert.match(frontend,/voiceChoice:\$\('#voice-choice'\)\?\.value/);
+  assert.doesNotMatch(voiceMarkup,/\.code|<code>/);
+  assert.doesNotMatch(cloneMarkup,/voice\.code|<code>/);
+  assert.match(api,/voiceChoices: await voiceChoices/);
+  assert.match(api,/admin-add-trend-voice/);
+  assert.match(api,/admin-remove-trend-voice/);
+  assert.match(providers,/export async function trendVoices/);
+  assert.match(providers,/export async function voiceChoices/);
+  assert.match(providers,/resolveVoiceChoice/);
+  assert.match(providers,/voiceCode: voice\.code/);
+  assert.match(providers,/voice: \{ label: voice\.label, kind:/);
+});
+
 test('admin login UI requires the password field',async()=>{
   const source=await readFile('public/app.js','utf8');
   const api=await readFile('api/index.js','utf8');
