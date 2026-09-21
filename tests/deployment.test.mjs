@@ -236,11 +236,11 @@ test('video library persists clear thumbnail images and backfills older videos',
 });
 
 
-test('admin login UI hides password while member login keeps it',async()=>{
+test('admin login UI requires the password field',async()=>{
   const source=await readFile('public/app.js','utf8');
   const api=await readFile('api/index.js','utf8');
-  assert.match(source,/id="password-field"/);
-  assert.match(source,/Admin tạm thời không cần nhập mật khẩu/);
-  assert.match(source,/\$\('#username'\)\.oninput=syncLoginMode/);
-  assert.match(api,/adminPasswordless = name === 'admin' && record\?\.role === 'admin'/);
+  assert.match(source,/id="password" type="password" autocomplete="current-password" required/);
+  assert.doesNotMatch(source,/Admin tạm thời không cần nhập mật khẩu|syncLoginMode/);
+  assert.doesNotMatch(api,/adminPasswordless/);
+  assert.match(api,/const password = text\(b\.password, 'Mật khẩu', 500\)/);
 });
