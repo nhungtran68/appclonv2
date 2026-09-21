@@ -234,3 +234,13 @@ test('video library persists clear thumbnail images and backfills older videos',
   assert.match(frontend,/<img src=/);
   assert.match(css,/\.asset-thumb video,\.asset-thumb img/);
 });
+
+
+test('admin login UI hides password while member login keeps it',async()=>{
+  const source=await readFile('public/app.js','utf8');
+  const api=await readFile('api/index.js','utf8');
+  assert.match(source,/id="password-field"/);
+  assert.match(source,/Admin tạm thời không cần nhập mật khẩu/);
+  assert.match(source,/\$\('#username'\)\.oninput=syncLoginMode/);
+  assert.match(api,/adminPasswordless = name === 'admin' && record\?\.role === 'admin'/);
+});
