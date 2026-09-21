@@ -37,6 +37,9 @@ test('script styles expose five defaults and private style creation fails closed
   const create=await req('script-style-create',{name:'Của tôi',prompt:'Viết ngắn và tự nhiên'});
   assert.equal(create.status,503);
   assert.equal((await create.json()).code,'REDIS_REQUIRED');
+  const update=await req('script-style-update',{styleId:'custom-test',name:'Của tôi',prompt:'Prompt mới'});
+  assert.equal(update.status,503);
+  assert.equal((await update.json()).code,'REDIS_REQUIRED');
 });
 
 test('admin state lists ten children plus admin',async()=>{

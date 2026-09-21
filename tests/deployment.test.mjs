@@ -269,6 +269,34 @@ test('script menu hides provider names and uses compact managed style dropdown',
   assert.doesNotMatch(providers.slice(providers.indexOf('export async function generateText'),providers.indexOf('const VBEE_TTS_URL')),/b\.provider|OPENAI_API_KEY|api\.openai\.com/);
 });
 
+test('users can edit or delete only their own custom script styles',async()=>{
+  const api=await readFile('api/index.js','utf8');
+  const styles=await readFile('lib/script-styles.mjs','utf8');
+  const frontend=await readFile('public/app.js','utf8');
+  assert.match(api,/action === 'script-style-update'/);
+  assert.match(styles,/export async function updateCustomScriptStyle/);
+  assert.match(styles,/Không tìm thấy phong cách riêng của tài khoản này/);
+  assert.match(styles,/Phong cách mặc định không thể sửa/);
+  assert.match(frontend,/data-edit-script-style/);
+  assert.match(frontend,/Cập nhật phong cách/);
+  assert.match(frontend,/cancel-edit-script-style/);
+  assert.match(frontend,/script-style-update/);
+});
+
+test('users can edit or delete only their own custom script styles',async()=>{
+  const api=await readFile('api/index.js','utf8');
+  const styles=await readFile('lib/script-styles.mjs','utf8');
+  const frontend=await readFile('public/app.js','utf8');
+  assert.match(api,/action === 'script-style-update'/);
+  assert.match(styles,/export async function updateCustomScriptStyle/);
+  assert.match(styles,/Không tìm thấy phong cách riêng của tài khoản này/);
+  assert.match(styles,/Phong cách mặc định không thể sửa/);
+  assert.match(frontend,/data-edit-script-style/);
+  assert.match(frontend,/Cập nhật phong cách/);
+  assert.match(frontend,/cancel-edit-script-style/);
+  assert.match(frontend,/script-style-update/);
+});
+
 test('script styles are private per user and admin can manage defaults',async()=>{
   const api=await readFile('api/index.js','utf8');
   const styles=await readFile('lib/script-styles.mjs','utf8');

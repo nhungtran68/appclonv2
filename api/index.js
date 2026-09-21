@@ -2,7 +2,7 @@ import { authenticate, users, verifyPassword, safeEqual, sessionCookie, checkOri
 import { hasRedis, limit, get, setPersistent } from '../lib/store.mjs';
 import { models, generateText, vbeeSubmit, vbeeStatus, vbeeAudio, assignedVoice, analyze } from '../lib/providers.mjs';
 import { transcribeCloneChunk } from '../lib/video-clone.mjs';
-import { scriptStylesForUser, resolveScriptStyle, createCustomScriptStyle, deleteCustomScriptStyle, defaultScriptStyles, customScriptStylesForUser, saveDefaultScriptPrompt } from '../lib/script-styles.mjs';
+import { scriptStylesForUser, resolveScriptStyle, createCustomScriptStyle, updateCustomScriptStyle, deleteCustomScriptStyle, defaultScriptStyles, customScriptStylesForUser, saveDefaultScriptPrompt } from '../lib/script-styles.mjs';
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
@@ -105,6 +105,7 @@ export default async function handler(req, res) {
       return json(res, await generateText(user, { duration: b.duration, context: b.context, style: style.name, stylePrompt: style.prompt }));
     }
     if (action === 'script-style-create') return json(res, await createCustomScriptStyle(user, b));
+    if (action === 'script-style-update') return json(res, await updateCustomScriptStyle(user, b));
     if (action === 'script-style-delete') return json(res, await deleteCustomScriptStyle(user, b.styleId));
     if (action === 'analysis') return json(res, await analyze(user, b));
 
