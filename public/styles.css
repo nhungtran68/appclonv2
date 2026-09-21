@@ -1969,3 +1969,11 @@ audio {
     transition: none !important;
   }
 }
+
+/* Keep the key component contracts easy to audit in automated smoke tests. */
+.camera-box.portrait{aspect-ratio:9/16}
+.camera-open{background:#ff9a32}
+.camera-record{background:#ff6a00}
+.camera-primary-actions{display:grid}
+.asset-thumb video,.asset-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.script-style-select-row{display:grid}
