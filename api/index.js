@@ -103,7 +103,7 @@ export default async function handler(req, res) {
     const b = await readJson(req);
     if (action === 'text') {
       const style = await resolveScriptStyle(user, b.styleId);
-      return json(res, await generateText(user, { duration: b.duration, context: b.context, style: style.name, stylePrompt: style.prompt }));
+      return json(res, await generateText(user, { duration: b.duration, context: b.context, title: b.title, style: style.name, stylePrompt: style.prompt }));
     }
     if (action === 'script-style-create') return json(res, await createCustomScriptStyle(user, b));
     if (action === 'script-style-update') return json(res, await updateCustomScriptStyle(user, b));

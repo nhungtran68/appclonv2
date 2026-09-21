@@ -269,6 +269,23 @@ test('script menu hides provider names and uses compact managed style dropdown',
   assert.doesNotMatch(providers.slice(providers.indexOf('export async function generateText'),providers.indexOf('const VBEE_TTS_URL')),/b\.provider|OPENAI_API_KEY|api\.openai\.com/);
 });
 
+test('script title appears only when video analysis is disabled',async()=>{
+  const frontend=await readFile('public/app.js','utf8');
+  const providers=await readFile('lib/providers.mjs','utf8');
+  const api=await readFile('api/index.js','utf8');
+  assert.match(frontend,/id="script-title-field" hidden/);
+  assert.match(frontend,/id="script-title"/);
+  assert.match(frontend,/syncScriptSourceMode/);
+  assert.match(frontend,/input\.required=!useAnalysis/);
+  assert.match(frontend,/Hãy nhập tiêu đề hoặc chủ đề mong muốn/);
+  assert.match(frontend,/title=useAnalysis\?'':/);
+  assert.match(frontend,/context,title/);
+  assert.match(api,/title: b\.title/);
+  assert.match(providers,/const title = text\(b\.title \|\| '', 'Tiêu đề', 300, 0\)/);
+  assert.match(providers,/if \(!context && !title\) fail\(400/);
+  assert.match(providers,/Requested title\/topic/);
+});
+
 test('users can edit or delete only their own custom script styles',async()=>{
   const api=await readFile('api/index.js','utf8');
   const styles=await readFile('lib/script-styles.mjs','utf8');
