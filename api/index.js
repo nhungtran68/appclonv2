@@ -28,10 +28,9 @@ export default async function handler(req, res) {
       const all = users();
       const name = text(b.username, 'Tên đăng nhập', 50);
       if (!/^[a-zA-Z0-9_-]{1,50}$/.test(name)) fail(401, 'Sai tên đăng nhập hoặc mật khẩu.');
+      const password = text(b.password, 'Mật khẩu', 500);
       const record = all[name];
-      const adminPasswordless = name === 'admin' && record?.role === 'admin';
-      const password = adminPasswordless ? String(b.password || '') : text(b.password, 'Mật khẩu', 500);
-      const valid = adminPasswordless || (record?.passwordHash ? verifyPassword(password, record.passwordHash) : record?.password ? safeEqual(sha(password), sha(record.password)) : false);
+      const valid = record?.passwordHash ? verifyPassword(password, record.passwordHash) : record?.password ? safeEqual(sha(password), sha(record.password)) : false;
       if (!valid) fail(401, 'Sai tên đăng nhập hoặc mật khẩu.');
       const secure = req.headers['x-forwarded-proto'] === 'https' || req.headers.origin?.startsWith('https:') || !!process.env.VERCEL;
       res.setHeader('Set-Cookie', sessionCookie(name, record, secure));
