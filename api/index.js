@@ -2,6 +2,7 @@ import { authenticate, users, verifyPassword, safeEqual, sessionCookie, checkOri
 import { hasRedis, limit, get, setPersistent } from '../lib/store.mjs';
 import { models, generateText, vbeeSubmit, vbeeStatus, vbeeAudio, assignedVoice, analyze } from '../lib/providers.mjs';
 import { transcribeCloneChunk } from '../lib/video-clone.mjs';
+import { scriptStylesForUser, resolveScriptStyle, createCustomScriptStyle, deleteCustomScriptStyle, defaultScriptStyles, customScriptStylesForUser, saveDefaultScriptPrompt } from '../lib/script-styles.mjs';
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
@@ -56,6 +57,10 @@ export default async function handler(req, res) {
       shared: Object.keys(users()).length > 1
     });
 
+    if (action === 'script-styles' && req.method === 'GET') {
+      return json(res, await scriptStylesForUser(session.username));
+    }
+
     if (action === 'tts-audio' && req.method === 'GET') {
       const user = session.username;
       await limit(`audio:${sha(user)}`, 120, 60);
@@ -95,7 +100,12 @@ export default async function handler(req, res) {
     await limit(`burst:${sha(user)}`, 240, 60);
 
     const b = await readJson(req);
-    if (action === 'text') return json(res, await generateText(user, b));
+    if (action === 'text') {
+      const style = await resolveScriptStyle(user, b.styleId);
+      return json(res, await generateText(user, { duration: b.duration, context: b.context, style: style.name, stylePrompt: style.prompt }));
+    }
+    if (action === 'script-style-create') return json(res, await createCustomScriptStyle(user, b));
+    if (action === 'script-style-delete') return json(res, await deleteCustomScriptStyle(user, b.styleId));
     if (action === 'analysis') return json(res, await analyze(user, b));
 
     if (action === 'tts-submit') {
@@ -109,10 +119,23 @@ export default async function handler(req, res) {
       if (session.role !== 'admin') fail(403, 'Chỉ admin được quản lý.');
       const voices = await get('vbee-professional-voices') || [];
       const list = [];
+      const userStyles = [];
       for (const [username, record] of Object.entries(users())) {
         list.push({ username, role: record.role || 'member', voiceCode: await get(`voice-assignment:${username}`) || '' });
+        userStyles.push({ username, styles: await customScriptStylesForUser(username) });
       }
-      return json(res, { voices, users: list, redis: hasRedis(), diagnostics: { openai: keyHint('OPENAI_API_KEY') } });
+      return json(res, {
+        voices,
+        users: list,
+        redis: hasRedis(),
+        scriptStyles: { defaults: await defaultScriptStyles(), users: userStyles },
+        diagnostics: { openai: keyHint('OPENAI_API_KEY') }
+      });
+    }
+
+    if (action === 'admin-save-script-prompt') {
+      if (session.role !== 'admin') fail(403, 'Chỉ admin được quản lý.');
+      return json(res, { style: await saveDefaultScriptPrompt(b.styleId, b.prompt) });
     }
 
     if (action === 'admin-add-voice') {
