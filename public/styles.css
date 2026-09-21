@@ -42,17 +42,17 @@
 .camera-stop:hover{background:#482126}
 @media(max-width:560px){.camera-primary-actions{grid-template-columns:1fr}.camera-cta{min-height:52px}}
 
-.script-style-grid{display:grid;grid-template-columns:1fr;gap:10px}
-.script-style-card{display:block;border:1px solid var(--line);border-radius:11px;padding:13px;background:#151620;cursor:pointer;transition:border-color .15s,background .15s}
-.script-style-card:has(input:checked){border-color:#a992ff;background:#211d31}
-.script-style-top{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:9px}
-.script-style-top input{accent-color:var(--purple)}
-.script-style-top strong{font-size:12px;line-height:1.4}
-.script-style-actions{display:flex;gap:7px;justify-content:flex-end;margin-top:10px}
 .prompt-preview{white-space:pre-wrap;line-height:1.7;font-size:12px;color:#d7d8e4;margin-top:12px;padding:12px;background:#11121a;border:1px solid var(--line);border-radius:8px;overflow-wrap:anywhere}
 .custom-style-builder{border:1px dashed #44475a;border-radius:10px;padding:12px 13px;background:#14151e}
 .custom-style-builder summary{cursor:pointer;font-weight:650;font-size:12px;color:#d8d9e5}
 .custom-style-builder[open] summary{margin-bottom:15px}
 .admin-style-detail{margin-top:10px;border-top:1px solid var(--line);padding-top:9px}
 .admin-style-detail summary{cursor:pointer;font-size:12px;font-weight:600}
-@media(min-width:900px){.script-style-grid{grid-template-columns:1fr 1fr}}
+
+.script-style-select-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:9px;align-items:center}
+.script-style-select-row select{min-width:0}
+.script-style-select-row .small{white-space:nowrap;min-height:42px}
+.custom-style-list{display:grid;gap:8px;margin-top:14px}
+.custom-style-item{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:#11121a}
+.custom-style-item span{font-size:12px;line-height:1.35;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:520px){.script-style-select-row{grid-template-columns:1fr}.script-style-select-row .small{width:100%}}
