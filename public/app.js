@@ -83,8 +83,22 @@ function scriptMarkup(){
 async function loadScriptStyles(){S.scriptStyles=await api('script-styles')}
 function allScriptStyles(){return [...(S.scriptStyles?.defaults||[]),...(S.scriptStyles?.custom||[])]}
 function currentScriptStyle(){const id=$('#script-style')?.value;return allScriptStyles().find(style=>style.id===id)||null}
-function showStylePrompt(style){if(!style)return;$('#style-prompt-title').textContent=style.name;$('#style-prompt-text').textContent=style.prompt;$('#style-prompt-viewer').hidden=false}
-function renderScriptPage(){const page=$('#page-script');if(!page)return;page.innerHTML=scriptMarkup();bindScriptEvents();updateCounts()}
+function showStylePrompt(style){
+ if(!style)return;
+ const title=$('#style-prompt-title'),textBox=$('#style-prompt-text'),viewer=$('#style-prompt-viewer');
+ if(!title||!textBox||!viewer)return;
+ title.textContent=style.name;textBox.textContent=style.prompt;viewer.hidden=false;
+}
+function renderScriptPage(){
+ const page=$('#page-script');if(!page)return;
+ const prev={script:$('#script-editor')?.value||'',duration:$('#script-duration')?.value||'60',styleId:$('#script-style')?.value||'',includeAnalysis:$('#include-analysis')?.checked??true};
+ page.innerHTML=scriptMarkup();
+ if($('#script-editor'))$('#script-editor').value=prev.script;
+ if($('#script-duration'))$('#script-duration').value=prev.duration;
+ if(prev.styleId&&$('#script-style')&&allScriptStyles().some(style=>style.id===prev.styleId))$('#script-style').value=prev.styleId;
+ if($('#include-analysis'))$('#include-analysis').checked=prev.includeAnalysis;
+ bindScriptEvents();updateCounts();
+}
 function bindScriptEvents(){
  if(!$('#generate-script'))return;
  $('#view-style-prompt').onclick=()=>showStylePrompt(currentScriptStyle());
@@ -395,26 +409,41 @@ async function renderCloneVideo(){
 }
 
 function renderSettings(){
- const cfg=S.session;
+ const cfg=S.session;if(!cfg)return;
+ const providerBox=$('#provider-list'),limiter=$('#limiter-notice');if(!providerBox||!limiter)return;
  const defs=[['vbee','Ibee AIVoice','Cấu hình API phía máy chủ'],['deepseek','DeepSeek Vision + Text','DEEPSEEK_API_KEY'],['openai','OpenAI','OPENAI_API_KEY']];
- $('#provider-list').innerHTML=defs.map(([id,n,e])=>`<div class="provider"><h3>${n}</h3><span class="pill ${cfg.providers[id]?'green':''}">${cfg.providers[id]?'Đã cấu hình':'Chưa cấu hình'}</span><code>${e}</code></div>`).join('');
- $('#limiter-notice').textContent=cfg.limiter==='redis'?'Redis đã kết nối: có thể lưu phân quyền giọng cho nhiều tài khoản.':'Chưa có Upstash Redis: tạo nội dung đa tài khoản và gán giọng sẽ bị chặn để tránh vượt hạn mức.';
- $('#limiter-notice').className=`notice ${cfg.limiter==='redis'?'success':'warning'}`;
+ providerBox.innerHTML=defs.map(([id,n,e])=>`<div class="provider"><h3>${n}</h3><span class="pill ${cfg.providers[id]?'green':''}">${cfg.providers[id]?'Đã cấu hình':'Chưa cấu hình'}</span><code>${e}</code></div>`).join('');
+ limiter.textContent=cfg.limiter==='redis'?'Redis đã kết nối: có thể lưu phân quyền giọng cho nhiều tài khoản.':'Chưa có Upstash Redis: tạo nội dung đa tài khoản và gán giọng sẽ bị chặn để tránh vượt hạn mức.';
+ limiter.className=`notice ${cfg.limiter==='redis'?'success':'warning'}`;
  if(cfg.role==='admin')loadAdminState();
 }
 async function loadAdminState(){
  try{S.adminState=await api('admin-state',{});renderAdmin()}catch(e){toast(e.message,true)}
 }
 function renderAdmin(){
- if(!S.adminState||!$('#admin-users'))return;
- const voices=S.adminState.voices||[],oa=S.adminState.diagnostics?.openai;
- if($('#openai-key-diagnostic')){$('#openai-key-diagnostic').className='notice '+(oa?.configured?'success':'warning');$('#openai-key-diagnostic').textContent=oa?.configured?'Khóa dịch vụ phụ trợ đã được cấu hình.':'Khóa dịch vụ phụ trợ chưa được cấu hình.'}
- $('#admin-voices').innerHTML=voices.length?voices.map(v=>'<div class="voice-card"><div class="row between"><div><strong>'+esc(v.label)+'</strong><br><code>'+esc(v.code)+'</code></div><button class="small danger" data-remove-pro-voice="'+esc(v.code)+'">Xóa</button></div></div>').join(''):'<div class="empty">Chưa thêm giọng chuyên nghiệp.</div>';
- $('#admin-users').innerHTML=(S.adminState.users||[]).map(u=>'<div class="voice-card"><div class="row between"><strong>'+esc(u.username)+'</strong><span class="pill">'+esc(u.role)+'</span></div><div class="field"><select data-assign-user="'+esc(u.username)+'"><option value="">-- Chưa cấp giọng --</option>'+voices.map(v=>'<option value="'+esc(v.code)+'" '+(u.voiceCode===v.code?'selected':'')+'>'+esc(v.label)+'</option>').join('')+'</select></div></div>').join('');
- const styleState=S.adminState.scriptStyles||{defaults:[],users:[]};
- if($('#admin-default-script-styles'))$('#admin-default-script-styles').innerHTML=(styleState.defaults||[]).map(style=>'<div class="voice-card"><strong>'+esc(style.name)+'</strong><div class="field"><textarea rows="6" maxlength="6000" data-admin-default-prompt="'+esc(style.id)+'">'+esc(style.prompt)+'</textarea></div><button class="small primary" data-save-default-prompt="'+esc(style.id)+'">Lưu Prompt</button></div>').join('');
- if($('#admin-user-script-styles'))$('#admin-user-script-styles').innerHTML=(styleState.users||[]).map(u=>'<div class="voice-card"><div class="row between"><strong>'+esc(u.username)+'</strong><span class="pill">'+u.styles.length+' phong cách</span></div>'+(u.styles.length?u.styles.map(style=>'<details class="admin-style-detail"><summary>'+esc(style.name)+'</summary><div class="prompt-preview">'+esc(style.prompt)+'</div></details>').join(''):'<p class="tiny muted">Chưa tạo phong cách riêng.</p>')+'</div>').join('');
- $$('[data-save-default-prompt]').forEach(button=>button.onclick=()=>busy(button,async()=>{const area=$('[data-admin-default-prompt="'+button.dataset.saveDefaultPrompt+'"]');await api('admin-save-script-prompt',{styleId:button.dataset.saveDefaultPrompt,prompt:area.value});await loadAdminState();await loadScriptStyles();renderScriptPage();toast('Đã lưu prompt mặc định.')} ));
+ if(!S.adminState)return;
+ const voices=Array.isArray(S.adminState.voices)?S.adminState.voices:[];
+ const users=Array.isArray(S.adminState.users)?S.adminState.users:[];
+ const oa=S.adminState.diagnostics?.openai;
+ const voiceBox=$('#admin-voices'),userBox=$('#admin-users');
+ if(!voiceBox||!userBox)return;
+ const diagnostic=$('#openai-key-diagnostic');
+ if(diagnostic){diagnostic.className='notice '+(oa?.configured?'success':'warning');diagnostic.textContent=oa?.configured?'Khóa dịch vụ phụ trợ đã được cấu hình.':'Khóa dịch vụ phụ trợ chưa được cấu hình.'}
+ voiceBox.innerHTML=voices.length?voices.map(v=>'<div class="voice-card"><div class="row between"><div><strong>'+esc(v?.label||'Giọng')+'</strong><br><code>'+esc(v?.code||'')+'</code></div><button class="small danger" data-remove-pro-voice="'+esc(v?.code||'')+'">Xóa</button></div></div>').join(''):'<div class="empty">Chưa thêm giọng chuyên nghiệp.</div>';
+ userBox.innerHTML=users.map(u=>'<div class="voice-card"><div class="row between"><strong>'+esc(u?.username||'')+'</strong><span class="pill">'+esc(u?.role||'member')+'</span></div><div class="field"><select data-assign-user="'+esc(u?.username||'')+'"><option value="">-- Chưa cấp giọng --</option>'+voices.map(v=>'<option value="'+esc(v?.code||'')+'" '+(u?.voiceCode===v?.code?'selected':'')+'>'+esc(v?.label||'Giọng')+'</option>').join('')+'</select></div></div>').join('');
+ const rawStyleState=S.adminState.scriptStyles;
+ const styleState=rawStyleState&&typeof rawStyleState==='object'?rawStyleState:{};
+ const defaults=Array.isArray(styleState.defaults)?styleState.defaults:[];
+ const styleUsers=Array.isArray(styleState.users)?styleState.users:[];
+ const defaultBox=$('#admin-default-script-styles'),userStyleBox=$('#admin-user-script-styles');
+ if(defaultBox)defaultBox.innerHTML=defaults.map(style=>'<div class="voice-card"><strong>'+esc(style?.name||'Phong cách')+'</strong><div class="field"><textarea rows="6" maxlength="6000" data-admin-default-prompt="'+esc(style?.id||'')+'">'+esc(style?.prompt||'')+'</textarea></div><button class="small primary" data-save-default-prompt="'+esc(style?.id||'')+'">Lưu Prompt</button></div>').join('');
+ if(userStyleBox)userStyleBox.innerHTML=styleUsers.map(u=>{const list=Array.isArray(u?.styles)?u.styles:[];return '<div class="voice-card"><div class="row between"><strong>'+esc(u?.username||'')+'</strong><span class="pill">'+list.length+' phong cách</span></div>'+(list.length?list.map(style=>'<details class="admin-style-detail"><summary>'+esc(style?.name||'Phong cách')+'</summary><div class="prompt-preview">'+esc(style?.prompt||'')+'</div></details>').join(''):'<p class="tiny muted">Chưa tạo phong cách riêng.</p>')+'</div>'}).join('');
+ $$('[data-save-default-prompt]').forEach(button=>button.onclick=()=>busy(button,async()=>{
+   const area=$('[data-admin-default-prompt="'+button.dataset.saveDefaultPrompt+'"]');
+   if(!area)throw new Error('Không tìm thấy ô Prompt cần lưu.');
+   await api('admin-save-script-prompt',{styleId:button.dataset.saveDefaultPrompt,prompt:area.value});
+   await loadAdminState();await loadScriptStyles();renderScriptPage();toast('Đã lưu prompt mặc định.');
+ }));
 }
 function applyCameraRatioUI(){
  const box=$('#camera-box'),ratio=$('#camera-ratio');if(!box||!ratio)return;
