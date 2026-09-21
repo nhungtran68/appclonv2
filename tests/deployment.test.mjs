@@ -98,11 +98,10 @@ test('video voice clone replaces audio locally without lip-sync provider or FFmp
 });
 
 
-test('admin UI shows only a masked OpenAI key fingerprint',async()=>{
+test('admin diagnostics do not expose provider secrets',async()=>{
   const source=await readFile('public/app.js','utf8');
-  assert.match(source,/OpenAI key production đang đọc/);
-  assert.match(source,/oa\.hint/);
-  assert.doesNotMatch(source,/OPENAI_API_KEY\}\}/);
+  assert.match(source,/Khóa dịch vụ phụ trợ đã được cấu hình/);
+  assert.doesNotMatch(source,/OPENAI_API_KEY\}\}|oa\.hint/);
 });
 
 
@@ -172,7 +171,7 @@ test('video analysis uses smart scene-change frames and DeepSeek Vision only',as
   const env=await readFile('.env.example','utf8');
   assert.match(frontend,/detectSceneFrames/);
   assert.match(frontend,/Phân tích video/);
-  assert.match(frontend,/scene-sensitivity/);
+  assert.match(frontend,/sensitivity:'auto'/);
   assert.match(frontend,/mode:'scene_frames'/);
   assert.doesNotMatch(frontend,/analysis-mode|frame-count|google-start|google-file|Google Gemini/);
   assert.match(media,/export async function detectSceneFrames/);
@@ -245,6 +244,40 @@ test('video library persists clear thumbnail images and backfills older videos',
   assert.match(css,/\.asset-thumb video,\.asset-thumb img/);
 });
 
+
+test('script menu hides provider names and uses five managed default styles',async()=>{
+  const frontend=await readFile('public/app.js','utf8');
+  const styles=await readFile('lib/script-styles.mjs','utf8');
+  const providers=await readFile('lib/providers.mjs','utf8');
+  const start=frontend.indexOf('function scriptMarkup(){');
+  const end=frontend.indexOf('function voiceMarkup(){',start);
+  const scriptMarkup=frontend.slice(start,end);
+  assert.doesNotMatch(scriptMarkup,/DeepSeek|OpenAI|Nhà cung cấp|script-prompt|<label>Yêu cầu<\/label>/);
+  for(const seconds of ['30','40','60','90','120']) assert.match(scriptMarkup,new RegExp('value="'+seconds+'"'));
+  for(const name of ['Giới thiệu tự nhiên','Review TikTok','Bắt Trend','Kể chuyện trải nghiệm','Storytelling cảm xúc']) assert.match(styles,new RegExp(name));
+  assert.match(frontend,/data-view-script-style/);
+  assert.match(frontend,/Tạo phong cách riêng/);
+  assert.match(frontend,/custom-style-name/);
+  assert.match(frontend,/custom-style-prompt/);
+  assert.match(frontend,/data-delete-script-style/);
+  assert.match(providers,/models\(\)\.deepseek/);
+  assert.doesNotMatch(providers.slice(providers.indexOf('export async function generateText'),providers.indexOf('const VBEE_TTS_URL')),/b\.provider|OPENAI_API_KEY|api\.openai\.com/);
+});
+
+test('script styles are private per user and admin can manage defaults',async()=>{
+  const api=await readFile('api/index.js','utf8');
+  const styles=await readFile('lib/script-styles.mjs','utf8');
+  const frontend=await readFile('public/app.js','utf8');
+  assert.match(styles,/script-custom-styles:\$\{user\}/);
+  assert.match(styles,/Phong cách mặc định không thể xóa/);
+  assert.match(api,/action === 'script-style-create'/);
+  assert.match(api,/action === 'script-style-delete'/);
+  assert.match(api,/action === 'admin-save-script-prompt'/);
+  assert.match(api,/customScriptStylesForUser\(username\)/);
+  assert.match(frontend,/admin-default-script-styles/);
+  assert.match(frontend,/admin-user-script-styles/);
+  assert.match(frontend,/data-save-default-prompt/);
+});
 
 test('admin login UI requires the password field',async()=>{
   const source=await readFile('public/app.js','utf8');
