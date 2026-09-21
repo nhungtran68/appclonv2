@@ -45,6 +45,12 @@ test('script styles expose five defaults and private style creation fails closed
 test('admin state lists ten children plus admin',async()=>{
   const r=await req('admin-state',{}); assert.equal(r.status,200); const d=await r.json(); assert.equal(d.users.length,11); assert.equal(d.redis,false); assert.equal(d.diagnostics.openai.hint,'sk-proj-…9CgA'); assert.ok(!JSON.stringify(d).includes('sk-proj-testkey-9CgA'));
 });
+test('adding a trend voice fails closed until shared Redis is configured',async()=>{
+  const r=await req('admin-add-trend-voice',{label:'Giọng Trend',code:'trend-voice-code'});
+  assert.equal(r.status,503);
+  assert.equal((await r.json()).code,'REDIS_REQUIRED');
+});
+
 test('adding a voice fails closed until shared Redis is configured',async()=>{
   const r=await req('admin-add-voice',{label:'Giọng Pro',code:'professional-voice-code'}); assert.equal(r.status,503); assert.equal((await r.json()).code,'REDIS_REQUIRED');
 });
