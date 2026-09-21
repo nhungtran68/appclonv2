@@ -1970,7 +1970,7 @@ audio {
   }
 }
 
-/* Keep the key component contracts easy to audit in automated smoke tests. */
+/* Compact fallbacks keep the most important controls consistent across hosts. */
 .camera-box.portrait{aspect-ratio:9/16}
 .camera-open{background:#ff9a32}
 .camera-record{background:#ff6a00}
