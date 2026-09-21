@@ -22,8 +22,8 @@ test('health is public and session is protected',async()=>{
   const h=await req('health'); assert.equal(h.status,200); assert.deepEqual(await h.json(),{ok:true,service:'cliplab'});
   assert.equal((await req('session')).status,401);
 });
-test('admin login exposes Vbee provider state without secrets',async()=>{
-  const r=await req('login',{username:'admin',password:process.env.APP_PASSWORD}); assert.equal(r.status,200); cookie=r.headers.get('set-cookie').split(';')[0];
+test('admin login works temporarily without a password and exposes provider state without secrets',async()=>{
+  const r=await req('login',{username:'admin',password:''}); assert.equal(r.status,200); cookie=r.headers.get('set-cookie').split(';')[0];
   const d=await (await req('session')).json(); assert.equal(d.username,'admin'); assert.equal(d.role,'admin'); assert.ok('vbee' in d.providers); assert.equal(d.providers.deepseek,true); assert.ok(!('google' in d.providers)); assert.ok(!('sync' in d.providers)); assert.ok(!('fish' in d.providers)); assert.ok(!('lipSync' in d));
   assert.ok(!JSON.stringify(d).includes(process.env.SESSION_SECRET));
 });
@@ -38,4 +38,11 @@ test('removed provider routes no longer exist',async()=>{
 });
 test('cross-origin login is rejected',async()=>{
   cookie=''; assert.equal((await req('login',{username:'admin',password:process.env.APP_PASSWORD},'https://evil.test')).status,403);
+});
+
+
+test('member accounts still require a password',async()=>{
+  cookie='';
+  const missing=await req('login',{username:'user01',password:''});
+  assert.equal(missing.status,400);
 });
