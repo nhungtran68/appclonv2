@@ -312,6 +312,21 @@ test('script styles are private per user and admin can manage defaults',async()=
   assert.match(frontend,/data-save-default-prompt/);
 });
 
+test('admin and custom-style bindings are null-safe',async()=>{
+  const source=await readFile('public/app.js','utf8');
+  assert.match(source,/\$\$\('\[data-edit-script-style\]'\)\.forEach/);
+  assert.match(source,/\$\$\('\[data-delete-script-style\]'\)\.forEach/);
+  assert.match(source,/\$\$\('\[data-save-default-prompt\]'\)\.forEach/);
+  assert.doesNotMatch(source,/(^|[^$])\$\('\[data-(?:edit-script-style|delete-script-style|save-default-prompt)\]'\)\.forEach/m);
+  assert.match(source,/Array\.isArray\(S\.adminState\.voices\)/);
+  assert.match(source,/Array\.isArray\(S\.adminState\.users\)/);
+  assert.match(source,/Array\.isArray\(styleState\.defaults\)/);
+  assert.match(source,/Array\.isArray\(styleState\.users\)/);
+  assert.match(source,/Array\.isArray\(u\?\.styles\)/);
+  assert.match(source,/const prev=\{script:/);
+  assert.match(source,/includeAnalysis:\$\('#include-analysis'\)\?\.checked\?\?true/);
+});
+
 test('admin login UI requires the password field',async()=>{
   const source=await readFile('public/app.js','utf8');
   const api=await readFile('api/index.js','utf8');
