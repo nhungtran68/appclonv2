@@ -406,6 +406,177 @@ function recorderMime() {
   return choices.find(x => MediaRecorder.isTypeSupported(x)) || '';
 }
 
+
+function outputDimensions(width, height) {
+  const w = Math.max(1, Number(width) || 1), h = Math.max(1, Number(height) || 1);
+  const maxLong = 1920, maxPixels = 2073600;
+  const scale = Math.min(1, maxLong / Math.max(w, h), Math.sqrt(maxPixels / (w * h)));
+  return { width: Math.max(2, Math.round(w * scale / 2) * 2), height: Math.max(2, Math.round(h * scale / 2) * 2) };
+}
+
+async function loadStillImage(blob) {
+  const url = URL.createObjectURL(blob);
+  const image = new Image();
+  try {
+    const ready = waitMedia(image, 'load', 15000);
+    image.src = url;
+    await ready;
+    if (!image.naturalWidth || !image.naturalHeight) throw new Error('Ảnh nguồn không hợp lệ.');
+    return { image, url };
+  } catch (e) {
+    URL.revokeObjectURL(url);
+    throw e;
+  }
+}
+
+export async function composeNarratedVideo(source, audioBlob, progress = () => {}) {
+  if (!source || !(source.blob instanceof Blob) || !['video', 'image'].includes(source.kind)) throw new Error('Media ghép video không hợp lệ.');
+  if (!(audioBlob instanceof Blob) || audioBlob.size < 32) throw new Error('File MP3 không hợp lệ.');
+  if (!window.MediaRecorder || !window.MediaStream || !HTMLCanvasElement.prototype.captureStream) throw new Error('Trình duyệt chưa hỗ trợ dựng video. Hãy dùng Chrome/Edge mới.');
+
+  const Audio = window.AudioContext || window.webkitAudioContext;
+  if (!Audio) throw new Error('Trình duyệt chưa hỗ trợ AudioContext.');
+
+  let audioContext, audioSource, outputStream, canvasStream, recorder, video, videoUrl, still, drawHandle, timer;
+  const snapshots = [];
+  try {
+    progress(1, 1, 'Đang đọc file âm thanh...');
+    audioContext = new Audio();
+    const audioBuffer = await audioContext.decodeAudioData(await audioBlob.arrayBuffer());
+    const targetDuration = audioBuffer.duration;
+    if (!Number.isFinite(targetDuration) || targetDuration < 0.1 || targetDuration > 300.5) throw new Error('Thời lượng MP3 không hợp lệ hoặc vượt 5 phút.');
+
+    let sourceWidth = 0, sourceHeight = 0, sourceDuration = 0;
+    if (source.kind === 'video') {
+      videoUrl = URL.createObjectURL(source.blob);
+      video = document.createElement('video');
+      video.src = videoUrl; video.muted = true; video.playsInline = true; video.preload = 'auto';
+      await waitMedia(video, 'loadeddata', 18000);
+      sourceWidth = video.videoWidth; sourceHeight = video.videoHeight;
+      sourceDuration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : Number(source.duration) || 0;
+      if (!sourceWidth || !sourceHeight || sourceDuration < 0.1) throw new Error('Video nguồn không hợp lệ.');
+
+      if (targetDuration > sourceDuration + 0.05) {
+        const dims = outputDimensions(sourceWidth, sourceHeight);
+        const points = [...new Set([0.08, sourceDuration * .5, Math.max(.08, sourceDuration - .08)].map(t => Math.max(0, Math.min(sourceDuration - .03, t))))];
+        for (const point of points) {
+          await seekVideo(video, point);
+          const snap = document.createElement('canvas');
+          snap.width = dims.width; snap.height = dims.height;
+          const snapCtx = snap.getContext('2d', { alpha: false });
+          if (!snapCtx) throw new Error('Không tạo được ảnh nối từ video.');
+          snapCtx.drawImage(video, 0, 0, snap.width, snap.height);
+          snapshots.push(snap);
+        }
+        await seekVideo(video, 0);
+      }
+    } else {
+      still = await loadStillImage(source.blob);
+      sourceWidth = still.image.naturalWidth; sourceHeight = still.image.naturalHeight;
+    }
+
+    const dims = outputDimensions(sourceWidth, sourceHeight);
+    const canvas = document.createElement('canvas');
+    canvas.width = dims.width; canvas.height = dims.height;
+    const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
+    if (!ctx) throw new Error('Không tạo được khung dựng video.');
+
+    const drawSource = media => {
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(media, 0, 0, canvas.width, canvas.height);
+    };
+    if (source.kind === 'image') drawSource(still.image);
+    else if (video.readyState >= 2) drawSource(video);
+
+    canvasStream = canvas.captureStream(30);
+    const videoTracks = canvasStream.getVideoTracks();
+    if (!videoTracks.length) throw new Error('Không tạo được luồng hình ảnh.');
+
+    const dest = audioContext.createMediaStreamDestination();
+    audioSource = audioContext.createBufferSource();
+    audioSource.buffer = audioBuffer;
+    audioSource.connect(dest);
+    if (!dest.stream.getAudioTracks().length) throw new Error('Không tạo được luồng âm thanh.');
+
+    outputStream = new MediaStream([...videoTracks, ...dest.stream.getAudioTracks()]);
+    const mime = recorderMime();
+    const pixels = canvas.width * canvas.height;
+    const videoBitsPerSecond = Math.min(12_000_000, Math.max(2_800_000, Math.round(pixels * 3.2)));
+    recorder = new MediaRecorder(outputStream, {
+      ...(mime ? { mimeType: mime } : {}),
+      videoBitsPerSecond,
+      audioBitsPerSecond: 192000
+    });
+
+    const chunks = [];
+    const recorded = new Promise((resolve, reject) => {
+      recorder.ondataavailable = e => { if (e.data?.size) chunks.push(e.data); };
+      recorder.onerror = () => reject(new Error('Trình duyệt lỗi khi xuất video mới.'));
+      recorder.onstop = () => {
+        const type = (recorder.mimeType || mime || 'video/webm').split(';')[0];
+        const blob = new Blob(chunks, { type });
+        if (!blob.size) return reject(new Error('Video kết quả bị rỗng.'));
+        resolve({ blob, mime: type, extension: type.includes('mp4') ? 'mp4' : 'webm', width: canvas.width, height: canvas.height, duration: targetDuration });
+      };
+    });
+
+    await audioContext.resume();
+    const startedAt = performance.now();
+    let stopped = false;
+    const draw = () => {
+      if (stopped) return;
+      const elapsed = Math.max(0, (performance.now() - startedAt) / 1000);
+      if (source.kind === 'video') {
+        if (elapsed < sourceDuration - .03 && video.readyState >= 2 && !video.ended) {
+          drawSource(video);
+        } else if (snapshots.length) {
+          const extra = Math.max(0, elapsed - sourceDuration);
+          const index = Math.floor(extra / 2.5) % snapshots.length;
+          drawSource(snapshots[index]);
+        }
+      } else {
+        drawSource(still.image);
+      }
+      drawHandle = requestAnimationFrame(draw);
+    };
+
+    recorder.start(1000);
+    draw();
+    if (video) {
+      video.currentTime = 0;
+      await video.play().catch(() => { throw new Error('Không phát được video nguồn để ghép.'); });
+    }
+
+    const audioEnded = new Promise(resolve => { audioSource.onended = resolve; });
+    audioSource.start();
+    timer = setInterval(() => {
+      const elapsed = Math.min(targetDuration, (performance.now() - startedAt) / 1000);
+      progress(elapsed, targetDuration, elapsed < Math.min(sourceDuration || targetDuration, targetDuration) ? 'Đang ghép hình và lời thoại...' : 'Đang nối hình để giữ trọn MP3...');
+    }, 250);
+
+    await audioEnded;
+    stopped = true;
+    if (drawHandle) cancelAnimationFrame(drawHandle);
+    clearInterval(timer); timer = null;
+    progress(targetDuration, targetDuration, 'Đang hoàn tất video...');
+    await new Promise(resolve => setTimeout(resolve, 180));
+    if (recorder.state !== 'inactive') recorder.stop();
+    return await recorded;
+  } finally {
+    if (timer) clearInterval(timer);
+    try { if (drawHandle) cancelAnimationFrame(drawHandle); } catch {}
+    try { video?.pause(); } catch {}
+    try { if (recorder?.state && recorder.state !== 'inactive') recorder.stop(); } catch {}
+    try { audioSource?.stop(); } catch {}
+    try { outputStream?.getTracks().forEach(t => t.stop()); } catch {}
+    try { canvasStream?.getTracks().forEach(t => t.stop()); } catch {}
+    try { await audioContext?.close(); } catch {}
+    if (videoUrl) URL.revokeObjectURL(videoUrl);
+    if (still?.url) URL.revokeObjectURL(still.url);
+  }
+}
+
 export async function replaceVideoAudio(videoBlob, audioBlob, expectedDuration, progress = () => {}) {
   if (!(videoBlob instanceof Blob) || !(audioBlob instanceof Blob)) throw new Error('Video/audio đầu vào không hợp lệ.');
   if (!window.MediaRecorder || !window.MediaStream) throw new Error('Trình duyệt chưa hỗ trợ ghép audio vào video. Hãy dùng Chrome/Edge mới.');
