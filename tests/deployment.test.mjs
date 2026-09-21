@@ -245,21 +245,26 @@ test('video library persists clear thumbnail images and backfills older videos',
 });
 
 
-test('script menu hides provider names and uses five managed default styles',async()=>{
+test('script menu hides provider names and uses compact managed style dropdown',async()=>{
   const frontend=await readFile('public/app.js','utf8');
   const styles=await readFile('lib/script-styles.mjs','utf8');
   const providers=await readFile('lib/providers.mjs','utf8');
+  const css=await readFile('public/styles.css','utf8');
   const start=frontend.indexOf('function scriptMarkup(){');
   const end=frontend.indexOf('function voiceMarkup(){',start);
   const scriptMarkup=frontend.slice(start,end);
-  assert.doesNotMatch(scriptMarkup,/DeepSeek|OpenAI|Nhà cung cấp|script-prompt|<label>Yêu cầu<\/label>/);
+  assert.doesNotMatch(scriptMarkup,/DeepSeek|OpenAI|Nhà cung cấp|script-prompt|<label>Yêu cầu<\/label>|Mặc định/);
   for(const seconds of ['30','40','60','90','120']) assert.match(scriptMarkup,new RegExp('value="'+seconds+'"'));
   for(const name of ['Giới thiệu tự nhiên','Review TikTok','Bắt Trend','Kể chuyện trải nghiệm','Storytelling cảm xúc']) assert.match(styles,new RegExp(name));
-  assert.match(frontend,/data-view-script-style/);
+  assert.match(scriptMarkup,/id="script-style"/);
+  assert.match(scriptMarkup,/id="view-style-prompt"/);
+  assert.match(frontend,/currentScriptStyle\(\)/);
   assert.match(frontend,/Tạo phong cách riêng/);
   assert.match(frontend,/custom-style-name/);
   assert.match(frontend,/custom-style-prompt/);
   assert.match(frontend,/data-delete-script-style/);
+  assert.doesNotMatch(frontend,/data-view-script-style/);
+  assert.match(css,/\.script-style-select-row\{display:grid/);
   assert.match(providers,/models\(\)\.deepseek/);
   assert.doesNotMatch(providers.slice(providers.indexOf('export async function generateText'),providers.indexOf('const VBEE_TTS_URL')),/b\.provider|OPENAI_API_KEY|api\.openai\.com/);
 });
