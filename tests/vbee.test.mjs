@@ -58,7 +58,9 @@ test('Vbee flow mirrors working app: submit -> requestId -> COMPLETED -> audioLi
 
   const submitted=await vbeeSubmit('user01',{consent:true,text:'Xin chào từ ClipLab',speed:1},'https://app.example');
   assert.equal(submitted.requestId,'req-12345678');
-  assert.equal(submitted.voice.code,'voice-professional-1');
+  assert.equal(submitted.voice.label,'Giọng Pro');
+  assert.equal(submitted.voice.kind,'personal');
+  assert.equal('code' in submitted.voice,false);
   const state=await vbeeStatus('user01',submitted.token);
   assert.equal(state.ready,true);
   assert.equal(state.failed,false);
@@ -69,4 +71,28 @@ test('Vbee flow mirrors working app: submit -> requestId -> COMPLETED -> audioLi
   assert.equal(audio.data.length,8);
   assert.equal(calls.some(x=>x.href==='https://cdn.example.test/audio.mp3'),true);
   assert.equal(calls.some(x=>x.href==='https://api.vbee.vn/v1/tts'),true);
+});
+
+
+test('Trend voice choice resolves server-side without exposing voiceCode',async()=>{
+  const calls=[];
+  global.fetch=async(url,options={})=>{
+    const href=String(url); calls.push({href,options});
+    if(href==='https://redis.test/' || href==='https://redis.test'){
+      const args=JSON.parse(options.body);
+      if(args[0]==='GET' && args[1]==='cliplab:vbee-trend-voices') return json({result:JSON.stringify([{id:'trendvoice123',code:'n_trend_hidden_code',label:'Giọng Trend Hot'}])});
+      if(args[0]==='EVAL') return json({result:1});
+      throw new Error('Unexpected Redis command '+JSON.stringify(args));
+    }
+    if(href==='https://api.vbee.vn/v1/tts'){
+      const body=JSON.parse(options.body);
+      assert.equal(body.voiceCode,'n_trend_hidden_code');
+      return json({requestId:'req-trend-1234'});
+    }
+    throw new Error('Unexpected URL '+href);
+  };
+  const submitted=await vbeeSubmit('user01',{consent:true,text:'Xin chào',speed:1,voiceChoice:'trend:trendvoice123'},'https://app.example');
+  assert.equal(submitted.voice.label,'Giọng Trend Hot');
+  assert.equal(submitted.voice.kind,'trend');
+  assert.equal('code' in submitted.voice,false);
 });

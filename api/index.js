@@ -1,6 +1,6 @@
 import { authenticate, users, verifyPassword, safeEqual, sessionCookie, checkOrigin, readJson, text, json, publicError, sha, fail, secret, keyHint } from '../lib/core.mjs';
 import { hasRedis, limit, get, setPersistent } from '../lib/store.mjs';
-import { models, generateText, vbeeSubmit, vbeeStatus, vbeeAudio, assignedVoice, analyze } from '../lib/providers.mjs';
+import { models, generateText, vbeeSubmit, vbeeStatus, vbeeAudio, assignedVoice, voiceChoices, trendVoices, analyze } from '../lib/providers.mjs';
 import { transcribeCloneChunk } from '../lib/video-clone.mjs';
 import { scriptStylesForUser, resolveScriptStyle, createCustomScriptStyle, updateCustomScriptStyle, deleteCustomScriptStyle, defaultScriptStyles, customScriptStylesForUser, saveDefaultScriptPrompt } from '../lib/script-styles.mjs';
 
@@ -52,7 +52,8 @@ export default async function handler(req, res) {
         openai: !!process.env.OPENAI_API_KEY,
         deepseek: !!process.env.DEEPSEEK_API_KEY
       },
-      assignedVoice: await assignedVoice(session.username),
+      assignedVoice: (voice => voice ? { label: voice.label || 'Giọng của Tôi', kind: 'personal' } : null)(await assignedVoice(session.username)),
+      voiceChoices: await voiceChoices(session.username),
       limiter: hasRedis() ? 'redis' : 'memory',
       shared: Object.keys(users()).length > 1
     });
@@ -119,6 +120,7 @@ export default async function handler(req, res) {
     if (action === 'admin-state') {
       if (session.role !== 'admin') fail(403, 'Chỉ admin được quản lý.');
       const voices = await get('vbee-professional-voices') || [];
+      const trend = await trendVoices();
       const list = [];
       const userStyles = [];
       for (const [username, record] of Object.entries(users())) {
@@ -127,6 +129,7 @@ export default async function handler(req, res) {
       }
       return json(res, {
         voices,
+        trendVoices: trend,
         users: list,
         redis: hasRedis(),
         scriptStyles: { defaults: await defaultScriptStyles(), users: userStyles },
@@ -137,6 +140,30 @@ export default async function handler(req, res) {
     if (action === 'admin-save-script-prompt') {
       if (session.role !== 'admin') fail(403, 'Chỉ admin được quản lý.');
       return json(res, { style: await saveDefaultScriptPrompt(b.styleId, b.prompt) });
+    }
+
+    if (action === 'admin-add-trend-voice') {
+      if (session.role !== 'admin') fail(403, 'Chỉ admin được quản lý.');
+      if (!hasRedis()) fail(503, 'Cần Upstash Redis để lưu giọng Trend.', 'REDIS_REQUIRED');
+      const label = text(b.label, 'Tên giọng Trend', 80);
+      const code = text(b.code, 'Mã giọng Ibee', 180);
+      if (!/^[a-zA-Z0-9._:-]{2,180}$/.test(code)) fail(400, 'Mã giọng Ibee không hợp lệ.');
+      const current = await trendVoices();
+      const existing = current.find(v => v.code === code);
+      const id = existing?.id || sha(`trend:${code}`).slice(0, 24);
+      const next = [...current.filter(v => v.code !== code), { id, label, code, kind: 'trend' }];
+      await setPersistent('vbee-trend-voices', next);
+      return json(res, { trendVoices: next });
+    }
+
+    if (action === 'admin-remove-trend-voice') {
+      if (session.role !== 'admin') fail(403, 'Chỉ admin được quản lý.');
+      const id = text(b.id, 'Mã giọng Trend', 80);
+      const current = await trendVoices();
+      const next = current.filter(v => v.id !== id);
+      if (next.length === current.length) fail(404, 'Không tìm thấy giọng Trend.');
+      await setPersistent('vbee-trend-voices', next);
+      return json(res, { trendVoices: next });
     }
 
     if (action === 'admin-add-voice') {
