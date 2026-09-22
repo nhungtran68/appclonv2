@@ -1439,6 +1439,19 @@ audio {
   white-space: pre-wrap;
 }
 
+.style-prompt-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.style-prompt-actions > button {
+  min-width: 140px;
+}
+
 .custom-style-builder {
   padding: 13px;
   border: 1px dashed var(--line-strong);
@@ -1477,59 +1490,6 @@ audio {
 
 .script-style-select-row .small {
   min-height: 46px;
-  white-space: nowrap;
-}
-
-.custom-style-list {
-  display: grid;
-  gap: 8px;
-  margin-top: 14px;
-  padding: 13px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, .02);
-}
-
-.custom-style-list-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-width: 0;
-  padding-bottom: 4px;
-}
-
-.custom-style-list-head > div {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-}
-
-.custom-style-list-head small {
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1.45;
-}
-
-.custom-style-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-width: 0;
-  padding: 10px;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  background: #0d131c;
-}
-
-.custom-style-item > span {
-  min-width: 0;
-  overflow: hidden;
-  color: #dbe1eb;
-  font-size: 12px;
-  line-height: 1.35;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -1911,17 +1871,12 @@ audio {
     width: 100%;
   }
 
-  .custom-style-item {
+  .style-prompt-actions {
     align-items: stretch;
-    flex-direction: column;
   }
 
-  .custom-style-item .row {
-    width: 100%;
-  }
-
-  .custom-style-item .row > button {
-    flex: 1;
+  .style-prompt-actions > button {
+    flex: 1 1 140px;
   }
 
   .scene {
