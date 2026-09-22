@@ -1484,6 +1484,31 @@ audio {
   display: grid;
   gap: 8px;
   margin-top: 14px;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .02);
+}
+
+.custom-style-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding-bottom: 4px;
+}
+
+.custom-style-list-head > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.custom-style-list-head small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
 }
 
 .custom-style-item {
