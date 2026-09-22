@@ -255,7 +255,7 @@ test('video library persists clear thumbnail images and backfills older videos',
 });
 
 
-test('script menu hides provider names and uses compact managed style dropdown',async()=>{
+test('script menu hides provider names while writing provider stays server-controlled',async()=>{
   const frontend=await readFile('public/app.js','utf8');
   const styles=await readFile('lib/script-styles.mjs','utf8');
   const providers=await readFile('lib/providers.mjs','utf8');
@@ -276,7 +276,12 @@ test('script menu hides provider names and uses compact managed style dropdown',
   assert.doesNotMatch(frontend,/data-view-script-style/);
   assert.match(css,/\.script-style-select-row\{display:grid/);
   assert.match(providers,/models\(\)\.deepseek/);
-  assert.doesNotMatch(providers.slice(providers.indexOf('export async function generateText'),providers.indexOf('const VBEE_TTS_URL')),/b\.provider|OPENAI_API_KEY|api\.openai\.com/);
+  const generation=providers.slice(providers.indexOf('export async function generateText'),providers.indexOf('const VBEE_TTS_URL'));
+  assert.match(generation,/scriptWritingProvider/);
+  assert.match(generation,/OPENAI_API_KEY/);
+  assert.match(providers,/const OPENAI = 'https:\/\/api\.openai\.com\/v1'/);
+  assert.match(generation,/max_completion_tokens/);
+  assert.doesNotMatch(scriptMarkup,/admin-script-writing-provider|OPENAI_API_KEY|api\.openai\.com/);
 });
 
 test('script title appears only when video analysis is disabled',async()=>{
@@ -337,6 +342,9 @@ test('script styles are private per user and admin can manage defaults',async()=
   assert.match(frontend,/admin-default-script-styles/);
   assert.match(frontend,/admin-user-script-styles/);
   assert.match(frontend,/data-save-default-prompt/);
+  assert.match(api,/action === 'admin-save-script-writing-provider'/);
+  assert.match(frontend,/admin-script-writing-provider/);
+  assert.match(frontend,/admin-save-script-writing-provider/);
 });
 
 test('admin and custom-style bindings are null-safe',async()=>{

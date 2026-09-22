@@ -1,6 +1,6 @@
 import { authenticate, users, verifyPassword, safeEqual, sessionCookie, checkOrigin, readJson, text, json, publicError, sha, fail, secret, keyHint } from '../lib/core.mjs';
 import { hasRedis, limit, get, setPersistent } from '../lib/store.mjs';
-import { models, generateText, vbeeSubmit, vbeeStatus, vbeeAudio, assignedVoice, voiceChoices, trendVoices, analyze } from '../lib/providers.mjs';
+import { models, generateText, scriptWritingConfig, saveScriptWritingProvider, vbeeSubmit, vbeeStatus, vbeeAudio, assignedVoice, voiceChoices, trendVoices, analyze } from '../lib/providers.mjs';
 import { transcribeCloneChunk } from '../lib/video-clone.mjs';
 import { scriptStylesForUser, resolveScriptStyle, createCustomScriptStyle, updateCustomScriptStyle, deleteCustomScriptStyle, defaultScriptStyles, customScriptStylesForUser, saveDefaultScriptPrompt } from '../lib/script-styles.mjs';
 
@@ -132,9 +132,15 @@ export default async function handler(req, res) {
         trendVoices: trend,
         users: list,
         redis: hasRedis(),
+        scriptWriting: await scriptWritingConfig(),
         scriptStyles: { defaults: await defaultScriptStyles(), users: userStyles },
         diagnostics: { openai: keyHint('OPENAI_API_KEY') }
       });
+    }
+
+    if (action === 'admin-save-script-writing-provider') {
+      if (session.role !== 'admin') fail(403, 'Chỉ admin được quản lý.');
+      return json(res, await saveScriptWritingProvider(b.provider));
     }
 
     if (action === 'admin-save-script-prompt') {

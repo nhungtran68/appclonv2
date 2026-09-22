@@ -8,6 +8,7 @@ process.env.SESSION_SECRET='test-only-secret-DO-NOT-USE-IN-PRODUCTION-123456';
 process.env.APP_USERS_JSON='{}';
 process.env.OPENAI_API_KEY='sk-proj-testkey-9CgA';
 process.env.DEEPSEEK_API_KEY='deepseek-test-key';
+process.env.OPENAI_MODEL='gpt-5-mini';
 delete process.env.UPSTASH_REDIS_REST_URL;
 delete process.env.UPSTASH_REDIS_REST_TOKEN;
 
@@ -25,7 +26,7 @@ test('health is public and session is protected',async()=>{
 test('admin login requires APP_PASSWORD and exposes provider state without secrets',async()=>{
   const denied=await req('login',{username:'admin',password:''}); assert.equal(denied.status,400);
   const r=await req('login',{username:'admin',password:process.env.APP_PASSWORD}); assert.equal(r.status,200); cookie=r.headers.get('set-cookie').split(';')[0];
-  const d=await (await req('session')).json(); assert.equal(d.username,'admin'); assert.equal(d.role,'admin'); assert.ok('vbee' in d.providers); assert.equal(d.providers.deepseek,true); assert.ok(!('google' in d.providers)); assert.ok(!('sync' in d.providers)); assert.ok(!('fish' in d.providers)); assert.ok(!('lipSync' in d));
+  const d=await (await req('session')).json(); assert.equal(d.username,'admin'); assert.equal(d.role,'admin'); assert.equal(d.models.openai,'gpt-5-mini'); assert.ok('vbee' in d.providers); assert.equal(d.providers.deepseek,true); assert.ok(!('google' in d.providers)); assert.ok(!('sync' in d.providers)); assert.ok(!('fish' in d.providers)); assert.ok(!('lipSync' in d));
   assert.ok(!JSON.stringify(d).includes(process.env.SESSION_SECRET));
 });
 test('script styles expose five defaults and private style creation fails closed without Redis',async()=>{
@@ -43,7 +44,11 @@ test('script styles expose five defaults and private style creation fails closed
 });
 
 test('admin state lists ten children plus admin',async()=>{
-  const r=await req('admin-state',{}); assert.equal(r.status,200); const d=await r.json(); assert.equal(d.users.length,11); assert.equal(d.redis,false); assert.equal(d.diagnostics.openai.hint,'sk-proj-…9CgA'); assert.ok(!JSON.stringify(d).includes('sk-proj-testkey-9CgA'));
+  const r=await req('admin-state',{}); assert.equal(r.status,200); const d=await r.json(); assert.equal(d.users.length,11); assert.equal(d.redis,false); assert.equal(d.scriptWriting.provider,'deepseek'); assert.equal(d.scriptWriting.model,'deepseek-flash'); assert.equal(d.scriptWriting.openaiConfigured,true); assert.equal(d.scriptWriting.deepseekConfigured,true); assert.equal(d.diagnostics.openai.hint,'sk-proj-…9CgA'); assert.ok(!JSON.stringify(d).includes('sk-proj-testkey-9CgA'));
+});
+test('admin writing mode is validated and cannot be persisted without Redis',async()=>{
+  const invalid=await req('admin-save-script-writing-provider',{provider:'gemini'}); assert.equal(invalid.status,400);
+  const missingRedis=await req('admin-save-script-writing-provider',{provider:'openai'}); assert.equal(missingRedis.status,503); assert.equal((await missingRedis.json()).code,'REDIS_REQUIRED');
 });
 test('adding a trend voice fails closed until shared Redis is configured',async()=>{
   const r=await req('admin-add-trend-voice',{label:'Giọng Trend',code:'trend-voice-code'});
